@@ -1,0 +1,2473 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <title>DexOS Web — Bureau Portable & Mode Grand Écran</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Police Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Configuration Tailwind -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          animation: {
+            'pop-in': 'popIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            'slide-up': 'slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          },
+          keyframes: {
+            popIn: {
+              '0%': { opacity: '0', transform: 'scale(0.95) translateY(8px)' },
+              '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+            },
+            slideUp: {
+              '0%': { opacity: '0', transform: 'translateY(16px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Styles système & Glassmorphism */
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    input, textarea, .selectable-text {
+      user-select: text !important;
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Barres de défilement élégantes */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.65);
+    }
+
+    /* Fond d'écran dynamiques */
+    .wp-aurora {
+      background: radial-gradient(circle at 15% 20%, #3b82f6 0%, transparent 45%),
+                  radial-gradient(circle at 85% 30%, #8b5cf6 0%, transparent 50%),
+                  radial-gradient(circle at 50% 85%, #06b6d4 0%, transparent 50%),
+                  linear-gradient(135deg, #090d16 0%, #111827 100%);
+    }
+    .wp-sunset {
+      background: radial-gradient(circle at 20% 25%, #f43f5e 0%, transparent 45%),
+                  radial-gradient(circle at 80% 70%, #f59e0b 0%, transparent 50%),
+                  linear-gradient(135deg, #1e1b4b 0%, #31102f 100%);
+    }
+    .wp-emerald {
+      background: radial-gradient(circle at 25% 20%, #10b981 0%, transparent 45%),
+                  radial-gradient(circle at 80% 80%, #0284c7 0%, transparent 50%),
+                  linear-gradient(135deg, #06201b 0%, #0f172a 100%);
+    }
+    .wp-minimal {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    }
+    .wp-daylight {
+      background: radial-gradient(circle at 15% 20%, #60a5fa 0%, transparent 50%),
+                  radial-gradient(circle at 85% 75%, #a78bfa 0%, transparent 50%),
+                  linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%);
+    }
+
+    /* Glassmorphism fenêtres et barre des tâches */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
+    .dark .glass-panel {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(22px) saturate(180%);
+      -webkit-backdrop-filter: blur(22px) saturate(180%);
+    }
+
+    .glass-taskbar {
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(24px) saturate(200%);
+      -webkit-backdrop-filter: blur(24px) saturate(200%);
+    }
+    .dark .glass-taskbar {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(24px) saturate(200%);
+      -webkit-backdrop-filter: blur(24px) saturate(200%);
+    }
+
+    /* Poignée de redimensionnement fenêtre */
+    .resize-handle {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 18px;
+      height: 18px;
+      cursor: nwse-resize;
+      z-index: 20;
+    }
+
+    /* Empêcher la capture des événements souris par les iframes pendant le drag */
+    body.is-dragging iframe {
+      pointer-events: none !important;
+    }
+
+    /* Curseur virtuel piloté à distance par la souris de l'ordinateur */
+    #remote-pc-cursor {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 24px;
+      height: 24px;
+      pointer-events: none;
+      z-index: 99999;
+      transition: transform 0.04s linear;
+      filter: drop-shadow(0 3px 6px rgba(0,0,0,0.65));
+    }
+
+    @keyframes pulseRing {
+      0% { transform: scale(0.8); opacity: 0.9; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+    .cursor-click-ring {
+      animation: pulseRing 0.45s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="dark text-slate-900 dark:text-slate-100 overflow-hidden">
+
+  <!-- Curseur virtuel contrôlé par la souris du PC connecté -->
+  <div id="remote-pc-cursor" class="hidden">
+    <svg class="w-6 h-6 text-cyan-400" viewBox="0 0 24 24" fill="currentColor" stroke="#0f172a" stroke-width="1.5">
+      <path d="M4 3l16 9-7 2-3 7-6-18z"/>
+    </svg>
+    <span class="ml-4 -mt-1 px-1.5 py-0.5 rounded bg-cyan-500 text-slate-950 font-bold text-[9px] shadow">Souris PC</span>
+  </div>
+
+  <!-- Écran Récepteur Plein Écran (affiché sur l'ordinateur lorsqu'il reçoit le téléphone) -->
+  <div id="pc-receiver-stage" class="hidden fixed inset-0 bg-slate-950 z-[9995] flex flex-col">
+    <!-- Barre supérieure discrète du récepteur PC -->
+    <div class="h-11 px-4 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between text-xs text-slate-200 shrink-0">
+      <div class="flex items-center gap-3">
+        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          Récepteur PC Actif
+        </span>
+        <span id="receiver-status-text" class="text-slate-400 hidden sm:inline">Bougez la souris et tapez au clavier : vos actions contrôlent le téléphone en direct.</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="toggleReceiverFullscreen()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Plein écran</button>
+        <button onclick="stopDexConnectSession()" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition">Déconnecter</button>
+      </div>
+    </div>
+
+    <!-- Zone vidéo interactive qui capture souris & clavier du PC -->
+    <div id="receiver-viewport" tabindex="0" class="relative flex-1 w-full h-full bg-black flex items-center justify-center overflow-hidden cursor-crosshair focus:outline-none">
+      <video id="receiver-video" autoplay playsinline class="max-w-full max-h-full object-contain shadow-2xl"></video>
+      <div id="receiver-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 pointer-events-none">
+        <div class="w-16 h-16 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-3xl mb-3 animate-bounce">📱</div>
+        <h3 class="text-lg font-bold text-white mb-1">En attente du flux vidéo du téléphone...</h3>
+        <p class="text-xs text-slate-400 max-w-md">Sur votre téléphone, appuyez sur <b>« Connecter à l'ordinateur »</b>. Dès que la liaison est établie, l'écran s'affichera ici et votre clavier/souris prendront le contrôle.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conteneur Principal avec mise à l'échelle DPI (zoom) -->
+  <div id="os-root" class="relative w-full h-full wp-aurora transition-all duration-500 overflow-hidden flex flex-col justify-between" style="zoom: 1;">
+
+    <!-- Bannière d'état Mode Grand Écran / Connexion moniteur -->
+    <div id="desktop-mode-banner" class="hidden fixed top-3 left-1/2 -translate-x-1/2 z-[9999] px-4 py-1.5 rounded-full glass-panel border border-blue-500/40 shadow-lg flex items-center gap-2.5 text-xs font-medium text-blue-600 dark:text-blue-300 animate-pop-in">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span id="banner-text">Mode Bureau Grand Écran Actif (100%)</span>
+      <button onclick="exitDesktopMode()" class="ml-1 px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 hover:bg-red-500 hover:text-white transition text-[11px]">Quitter</button>
+    </div>
+
+    <!-- Zone de travail du Bureau (Icônes + Fenêtres) -->
+    <main id="desktop-area" class="relative flex-1 w-full h-[calc(100%-56px)] overflow-hidden p-4 sm:p-6">
+
+      <!-- Grille des icônes du Bureau -->
+      <div id="desktop-icons" class="grid grid-flow-col grid-rows-5 sm:grid-rows-6 gap-3 w-fit content-start z-10 relative">
+        <!-- Généré dynamiquement par JS -->
+      </div>
+
+      <!-- Calque des fenêtres ouvertes -->
+      <div id="windows-container" class="absolute inset-0 pointer-events-none z-20">
+        <!-- Les fenêtres sont injectées ici -->
+      </div>
+
+    </main>
+
+    <!-- Menu Démarrer / Lanceur d'applications -->
+    <div id="start-menu" class="hidden fixed bottom-16 left-3 sm:left-4 w-[calc(100vw-24px)] sm:w-[440px] max-h-[80vh] glass-panel border border-white/30 dark:border-slate-700/70 rounded-2xl shadow-2xl z-[9000] p-5 flex-col gap-4 animate-slide-up">
+      <!-- Barre de recherche d'applications -->
+      <div class="relative">
+        <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input id="app-search-input" type="text" placeholder="Rechercher une application, un fichier..." oninput="filterStartMenu(this.value)" class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/70 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <!-- Grille des applications -->
+      <div>
+        <div class="flex items-center justify-between mb-2.5 px-1">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Applications installées</span>
+          <span class="text-[11px] text-blue-500 font-medium">DexOS v2.4</span>
+        </div>
+        <div id="start-menu-apps" class="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+          <!-- Injecté par JS -->
+        </div>
+      </div>
+
+      <!-- Actions rapides & Installation PWA -->
+      <div class="pt-3 border-t border-slate-200/70 dark:border-slate-700/70 flex flex-wrap items-center justify-between gap-2">
+        <button id="pwa-install-btn" onclick="triggerPWAInstall()" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium shadow-sm transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span>Installer l'App (PWA)</span>
+        </button>
+
+        <button onclick="openApp('connect'); toggleStartMenu(false);" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30 text-xs font-semibold transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          <span>Connecter au PC</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Centre de contrôle rapide (Système Tray Popover) -->
+    <div id="quick-settings-panel" class="hidden fixed bottom-16 right-3 sm:right-4 w-[310px] glass-panel border border-white/30 dark:border-slate-700/70 rounded-2xl shadow-2xl z-[9000] p-4 flex-col gap-3.5 animate-slide-up">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Contrôle Rapide</span>
+        <span id="screen-res-label" class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">1920×1080</span>
+      </div>
+
+      <!-- Boutons rapides 2x2 -->
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="openApp('connect')" id="qs-dex-btn" class="p-3 rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 flex flex-col items-start gap-1.5 transition text-left">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          <span class="text-xs font-semibold text-cyan-300">Connecter au PC</span>
+        </button>
+
+        <button onclick="toggleTheme()" class="p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-100/70 dark:bg-slate-800/70 hover:border-amber-500 flex flex-col items-start gap-1.5 transition text-left">
+          <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+          <span class="text-xs font-semibold" id="theme-label">Thème Sombre</span>
+        </button>
+      </div>
+
+      <!-- Curseur de mise à l'échelle (DPI / Zoom pour écran externe) -->
+      <div class="p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60">
+        <div class="flex justify-between text-xs mb-1.5">
+          <span class="font-medium">Échelle écran externe (DPI)</span>
+          <span id="zoom-value-display" class="font-mono text-blue-500 font-semibold">100%</span>
+        </div>
+        <input type="range" id="zoom-slider" min="75" max="135" step="5" value="100" oninput="setDisplayScale(this.value)" class="w-full accent-blue-600 cursor-pointer" />
+        <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+          <span>75% (Grand Moniteur)</span>
+          <span>100%</span>
+          <span>135% (TV / Tactile)</span>
+        </div>
+      </div>
+
+      <!-- Sélecteur de fond d'écran rapide -->
+      <div>
+        <span class="text-[11px] font-medium text-slate-500 dark:text-slate-400 block mb-1.5">Fond d'écran</span>
+        <div class="flex items-center gap-2">
+          <button onclick="setWallpaper('wp-aurora')" class="w-7 h-7 rounded-full wp-aurora border-2 border-white shadow" title="Aurore"></button>
+          <button onclick="setWallpaper('wp-sunset')" class="w-7 h-7 rounded-full wp-sunset border-2 border-white/60 shadow" title="Crépuscule"></button>
+          <button onclick="setWallpaper('wp-emerald')" class="w-7 h-7 rounded-full wp-emerald border-2 border-white/60 shadow" title="Émeraude"></button>
+          <button onclick="setWallpaper('wp-minimal')" class="w-7 h-7 rounded-full wp-minimal border-2 border-white/60 shadow" title="Carbone"></button>
+          <button onclick="setWallpaper('wp-daylight')" class="w-7 h-7 rounded-full wp-daylight border-2 border-slate-300 shadow" title="Jour"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barre des tâches inférieure (Taskbar) -->
+    <footer id="taskbar" class="relative h-14 w-full glass-taskbar border-t border-white/30 dark:border-slate-700/70 px-2.5 sm:px-4 flex items-center justify-between z-[8500] shadow-lg">
+
+      <!-- Gauche : Bouton Démarrer + Bouton Connecter à l'ordinateur -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <button id="start-btn" onclick="toggleStartMenu()" class="h-10 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white flex items-center gap-2 shadow-md shadow-blue-600/25 transition font-medium text-sm" title="Menu Démarrer & Applications">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/>
+          </svg>
+          <span class="hidden sm:inline">Démarrer</span>
+        </button>
+
+        <!-- Bouton proéminent Connecter à l'ordinateur (DexConnect) -->
+        <button onclick="openApp('connect')" id="taskbar-connect-btn" class="h-10 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 active:scale-95 text-white shadow-md shadow-cyan-600/25 flex items-center gap-2 text-xs font-semibold transition" title="Connecter ce téléphone à l'écran, clavier et souris d'un ordinateur">
+          <span id="connect-status-dot" class="w-2 h-2 rounded-full bg-slate-300"></span>
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2zM15 10l4-4m0 0l-4-4m4 4H9"/></svg>
+          <span>Connecter à l'ordi</span>
+        </button>
+      </div>
+
+      <!-- Centre : Fenêtres ouvertes & Applications épinglées -->
+      <div id="taskbar-windows" class="flex-1 flex items-center justify-start sm:justify-center gap-1.5 px-2 overflow-x-auto no-scrollbar">
+        <!-- Icônes des fenêtres actives injectées ici -->
+      </div>
+
+      <!-- Droite : Zone de notification système (Wi-Fi, Batterie, Plein écran, Horloge) -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <button onclick="toggleQuickSettings()" class="h-10 px-2.5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-slate-800/80 flex items-center gap-2.5 transition text-xs">
+          <!-- Indicateur réseau -->
+          <span id="network-indicator" title="Connecté à Internet" class="text-emerald-500">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+          </span>
+
+          <!-- Indicateur Batterie -->
+          <div class="hidden sm:flex items-center gap-1 text-slate-600 dark:text-slate-300" title="Niveau de batterie">
+            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h1a2 2 0 012 2v4a2 2 0 01-2 2h-1M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+            <span id="battery-level" class="font-mono text-[11px]">100%</span>
+          </div>
+
+          <!-- Horloge & Date -->
+          <div class="flex flex-col items-end leading-tight pl-1 border-l border-slate-300/60 dark:border-slate-700">
+            <span id="clock-time" class="font-semibold text-xs">12:00</span>
+            <span id="clock-date" class="text-[10px] text-slate-500 dark:text-slate-400">23/11/2026</span>
+          </div>
+        </button>
+
+        <!-- Bouton tout réduire (Afficher le bureau) -->
+        <button onclick="minimizeAllWindows()" class="w-2.5 h-8 rounded-full bg-slate-300/70 dark:bg-slate-700/70 hover:bg-blue-500 transition" title="Afficher le bureau (Tout réduire)"></button>
+      </div>
+    </footer>
+
+    <!-- Boîte de notification / Toast système -->
+    <div id="os-toast-container" class="fixed bottom-16 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Modal interne personnalisé (remplace prompt/confirm) -->
+    <div id="os-modal-overlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+      <div class="w-full max-w-sm glass-panel border border-white/30 dark:border-slate-700 rounded-2xl shadow-2xl p-5 animate-pop-in">
+        <h3 id="os-modal-title" class="text-base font-semibold mb-1.5">Titre</h3>
+        <p id="os-modal-desc" class="text-xs text-slate-600 dark:text-slate-300 mb-3">Description</p>
+        <input id="os-modal-input" type="text" class="hidden w-full px-3 py-2 mb-4 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <div class="flex justify-end gap-2">
+          <button id="os-modal-cancel" class="px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition">Annuler</button>
+          <button id="os-modal-confirm" class="px-3.5 py-2 rounded-xl text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition">Confirmer</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Input caché pour l'importation de fichiers réels depuis l'appareil -->
+  <input type="file" id="real-file-importer" multiple class="hidden" onchange="handleRealFileImport(event)" />
+
+  <script>
+    /* ==========================================================================
+       1. INITIALISATION PWA (MANIFEST DYNAMIQUE + SERVICE WORKER BLOB)
+       ========================================================================== */
+    let deferredInstallPrompt = null;
+
+    function initPWA() {
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW:', err));
+      }
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      showToast("Application prête à être installée sur votre appareil !", "info");
+    });
+
+    async function triggerPWAInstall() {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        if (outcome === 'accepted') {
+          showToast("DexOS Web est en cours d'installation...", "success");
+        }
+        deferredInstallPrompt = null;
+      } else {
+        showToast("Astuce : Ouvrez le menu de votre navigateur (⋮ ou Partager) et choisissez « Ajouter à l'écran d'accueil ».", "info");
+      }
+    }
+
+    /* ==========================================================================
+       2. SYSTÈME DE FICHIERS VIRTUEL PERSISTANT (LOCALSTORAGE)
+       ========================================================================== */
+    const VFS_STORAGE_KEY = 'dexos_vfs_v1';
+
+    const DEFAULT_VFS = {
+      id: 'root',
+      name: 'Racine',
+      type: 'folder',
+      children: [
+        {
+          id: 'dir-docs',
+          name: 'Documents',
+          type: 'folder',
+          children: [
+            {
+              id: 'file-welcome',
+              name: 'Bienvenue_sur_DexOS.md',
+              type: 'file',
+              mime: 'text/markdown',
+              updatedAt: new Date().toLocaleDateString('fr-FR'),
+              content: `# Bienvenue sur DexOS Web !\n\nVotre smartphone ou tablette est désormais prêt à fonctionner comme un véritable ordinateur portable.\n\n## Comment profiter du Mode Grand Écran :\n1. Connectez votre appareil à un moniteur PC ou une TV via un câble **USB-C vers HDMI** (ou sans fil via Miracast / AirPlay / Smart View).\n2. Cliquez sur le bouton **Mode Grand Écran** dans la barre des tâches en bas.\n3. Ajustez le curseur **Échelle écran externe (DPI)** dans le panneau de contrôle en bas à droite pour obtenir l'espace de travail idéal.\n\n## Fonctionnalités incluses :\n- **Mes Fichiers** : Créez des dossiers, importez des fichiers depuis votre téléphone et exportez vos documents.\n- **WebSurf** : Naviguez sur Internet avec onglets et favoris.\n- **Bloc-notes Pro** : Rédigez vos notes et sauvegardez-les directement dans vos dossiers.\n- **Terminal** : Pilotez le système en ligne de commande (tapez \`help\`).`
+            },
+            {
+              id: 'file-todo',
+              name: 'Liste_de_taches.txt',
+              type: 'file',
+              mime: 'text/plain',
+              updatedAt: new Date().toLocaleDateString('fr-FR'),
+              content: `- Tester la connexion sur le moniteur PC 24 pouces\n- Organiser mes dossiers de travail\n- Rédiger le compte-rendu de réunion dans Bloc-notes Pro`
+            }
+          ]
+        },
+        {
+          id: 'dir-notes',
+          name: 'Notes',
+          type: 'folder',
+          children: [
+            {
+              id: 'file-idee',
+              name: 'Idees_Projet.txt',
+              type: 'file',
+              mime: 'text/plain',
+              updatedAt: new Date().toLocaleDateString('fr-FR'),
+              content: `Idées d'utilisation du mode DeX Web :\n- Bureau mobile en déplacement avec clavier Bluetooth\n- Station de prise de notes rapide\n- Consultation web grand format`
+            }
+          ]
+        },
+        {
+          id: 'dir-images',
+          name: 'Images',
+          type: 'folder',
+          children: []
+        },
+        {
+          id: 'dir-downloads',
+          name: 'Téléchargements',
+          type: 'folder',
+          children: []
+        }
+      ]
+    };
+
+    let vfsRoot = loadVFS();
+
+    function loadVFS() {
+      try {
+        const raw = localStorage.getItem(VFS_STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return JSON.parse(JSON.stringify(DEFAULT_VFS));
+    }
+
+    function saveVFS() {
+      try {
+        localStorage.setItem(VFS_STORAGE_KEY, JSON.stringify(vfsRoot));
+      } catch (e) {
+        showToast("Espace de stockage local saturé !", "error");
+      }
+    }
+
+    // Recherche d'un nœud par ID dans l'arborescence
+    function findNodeById(id, node = vfsRoot) {
+      if (node.id === id) return node;
+      if (node.children) {
+        for (const child of node.children) {
+          const found = findNodeById(id, child);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    // Recherche du parent d'un nœud
+    function findParentNode(targetId, node = vfsRoot) {
+      if (!node.children) return null;
+      for (const child of node.children) {
+        if (child.id === targetId) return node;
+        const found = findParentNode(targetId, child);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    // Chemin complet d'un nœud
+    function getNodePath(targetId, node = vfsRoot, path = []) {
+      if (node.id === targetId) return [...path, node];
+      if (node.children) {
+        for (const child of node.children) {
+          const res = getNodePath(targetId, child, [...path, node]);
+          if (res) return res;
+        }
+      }
+      return null;
+    }
+
+    /* ==========================================================================
+       3. CATALOGUE DES APPLICATIONS DU SYSTÈME
+       ========================================================================== */
+    const APPS = {
+      connect: {
+        id: 'connect',
+        title: 'Connecter à l\'ordinateur',
+        iconBg: 'from-cyan-500 to-blue-600',
+        defaultW: 780,
+        defaultH: 540,
+        svg: `<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>`
+      },
+      files: {
+        id: 'files',
+        title: 'Mes Fichiers',
+        iconBg: 'from-amber-400 to-orange-500',
+        defaultW: 720,
+        defaultH: 480,
+        svg: `<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>`
+      },
+      browser: {
+        id: 'browser',
+        title: 'WebSurf Internet',
+        iconBg: 'from-sky-400 to-blue-600',
+        defaultW: 820,
+        defaultH: 520,
+        svg: `<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>`
+      },
+      notepad: {
+        id: 'notepad',
+        title: 'Bloc-notes Pro',
+        iconBg: 'from-emerald-400 to-teal-600',
+        defaultW: 640,
+        defaultH: 460,
+        svg: `<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>`
+      },
+      terminal: {
+        id: 'terminal',
+        title: 'Terminal',
+        iconBg: 'from-slate-700 to-slate-900',
+        defaultW: 620,
+        defaultH: 400,
+        svg: `<svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`
+      },
+      calculator: {
+        id: 'calculator',
+        title: 'Calculatrice',
+        iconBg: 'from-violet-500 to-purple-700',
+        defaultW: 320,
+        defaultH: 440,
+        svg: `<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>`
+      },
+      settings: {
+        id: 'settings',
+        title: 'Paramètres & Écran',
+        iconBg: 'from-indigo-500 to-blue-700',
+        defaultW: 660,
+        defaultH: 480,
+        svg: `<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`
+      }
+    };
+
+    /* ==========================================================================
+       4. GESTIONNAIRE DE FENÊTRES (MULTI-FENÊTRES, DRAG, RESIZE, SNAP)
+       ========================================================================== */
+    let windows = [];
+    let topZIndex = 100;
+    let windowCounter = 0;
+
+    function openApp(appId, params = {}) {
+      const app = APPS[appId];
+      if (!app) return;
+
+      toggleStartMenu(false);
+      toggleQuickSettings(false);
+
+      // Si une fenêtre de cette app est déjà ouverte (sauf éditeur avec un nouveau fichier), la mettre au premier plan
+      const existing = windows.find(w => w.appId === appId && !params.forceNew);
+      if (existing) {
+        if (existing.minimized) toggleMinimizeWindow(existing.id);
+        focusWindow(existing.id);
+        if (appId === 'notepad' && params.fileId) {
+          loadFileIntoNotepad(existing.id, params.fileId);
+        }
+        return existing.id;
+      }
+
+      windowCounter++;
+      const winId = `win-${windowCounter}`;
+      const isMobile = window.innerWidth < 640;
+
+      const maxW = window.innerWidth - (isMobile ? 16 : 48);
+      const maxH = window.innerHeight - 76;
+      const width = isMobile ? maxW : Math.min(app.defaultW, maxW);
+      const height = isMobile ? maxH : Math.min(app.defaultH, maxH);
+
+      const offset = (windows.length % 6) * 26;
+      const left = isMobile ? 8 : Math.max(24, Math.min((window.innerWidth - width) / 2 + offset, window.innerWidth - width - 16));
+      const top = isMobile ? 8 : Math.max(16, Math.min((window.innerHeight - 56 - height) / 2 + offset, window.innerHeight - 56 - height - 12));
+
+      const winObj = {
+        id: winId,
+        appId,
+        title: app.title,
+        left,
+        top,
+        width,
+        height,
+        minimized: false,
+        maximized: isMobile,
+        zIndex: ++topZIndex,
+        params
+      };
+
+      windows.push(winObj);
+      renderWindowElement(winObj);
+      renderTaskbar();
+      focusWindow(winId);
+      return winId;
+    }
+
+    function renderWindowElement(winObj) {
+      const app = APPS[winObj.appId];
+      const container = document.getElementById('windows-container');
+
+      const winEl = document.createElement('div');
+      winEl.id = winObj.id;
+      winEl.className = 'pointer-events-auto absolute flex flex-col glass-panel border border-white/40 dark:border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden animate-pop-in transition-[box-shadow]';
+      winEl.style.zIndex = winObj.zIndex;
+
+      if (winObj.maximized) {
+        winEl.style.left = '0px';
+        winEl.style.top = '0px';
+        winEl.style.width = '100%';
+        winEl.style.height = '100%';
+        winEl.style.borderRadius = '0px';
+      } else {
+        winEl.style.left = `${winObj.left}px`;
+        winEl.style.top = `${winObj.top}px`;
+        winEl.style.width = `${winObj.width}px`;
+        winEl.style.height = `${winObj.height}px`;
+      }
+
+      winEl.addEventListener('mousedown', () => focusWindow(winObj.id));
+      winEl.addEventListener('touchstart', () => focusWindow(winObj.id), { passive: true });
+
+      winEl.innerHTML = `
+        <!-- Barre de titre -->
+        <div id="${winObj.id}-header" class="h-11 px-3.5 bg-slate-100/80 dark:bg-slate-900/85 border-b border-slate-200/70 dark:border-slate-800 flex items-center justify-between cursor-move shrink-0">
+          <div class="flex items-center gap-2.5 overflow-hidden">
+            <div class="w-6 h-6 rounded-lg bg-gradient-to-br ${app.iconBg} flex items-center justify-center shrink-0 shadow-sm">
+              <div class="scale-75">${app.svg}</div>
+            </div>
+            <span id="${winObj.id}-title" class="text-xs sm:text-sm font-semibold truncate">${winObj.title}</span>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+            <button onclick="toggleMinimizeWindow('${winObj.id}')" class="w-7 h-7 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 transition" title="Réduire">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+            </button>
+            <button onclick="toggleMaximizeWindow('${winObj.id}')" class="w-7 h-7 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 transition" title="Agrandir / Restaurer">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+            </button>
+            <button onclick="closeWindow('${winObj.id}')" class="w-7 h-7 rounded-lg hover:bg-red-500 hover:text-white flex items-center justify-center text-slate-600 dark:text-slate-300 transition" title="Fermer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Contenu de l'application -->
+        <div id="${winObj.id}-body" class="flex-1 w-full h-[calc(100%-44px)] overflow-hidden bg-white/95 dark:bg-slate-950/95 relative"></div>
+
+        <!-- Poignée de redimensionnement -->
+        <div id="${winObj.id}-resize" class="resize-handle flex items-end justify-end p-1 text-slate-400/70">
+          <svg class="w-3 h-3" viewBox="0 0 12 12" fill="currentColor"><path d="M11 1v10H1L11 1z"/></svg>
+        </div>
+      `;
+
+      container.appendChild(winEl);
+      setupWindowDragAndResize(winObj, winEl);
+      mountAppContent(winObj);
+    }
+
+    function setupWindowDragAndResize(winObj, winEl) {
+      const header = document.getElementById(`${winObj.id}-header`);
+      const resizer = document.getElementById(`${winObj.id}-resize`);
+
+      // Double-clic sur barre de titre = maximiser
+      header.addEventListener('dblclick', () => toggleMaximizeWindow(winObj.id));
+
+      // Déplacement (Souris & Tactile)
+      const startDrag = (clientX, clientY) => {
+        if (winObj.maximized) return;
+        focusWindow(winObj.id);
+        document.body.classList.add('is-dragging');
+        const startX = clientX;
+        const startY = clientY;
+        const origLeft = winObj.left;
+        const origTop = winObj.top;
+
+        const onMove = (mx, my) => {
+          const dx = mx - startX;
+          const dy = my - startY;
+          winObj.left = Math.max(-winObj.width + 80, Math.min(origLeft + dx, window.innerWidth - 80));
+          winObj.top = Math.max(0, Math.min(origTop + dy, window.innerHeight - 90));
+          winEl.style.left = `${winObj.left}px`;
+          winEl.style.top = `${winObj.top}px`;
+        };
+
+        const onMouseMove = (e) => onMove(e.clientX, e.clientY);
+        const onTouchMove = (e) => {
+          if (e.touches[0]) onMove(e.touches[0].clientX, e.touches[0].clientY);
+        };
+
+        const stopDrag = () => {
+          document.body.classList.remove('is-dragging');
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', stopDrag);
+          window.removeEventListener('touchmove', onTouchMove);
+          window.removeEventListener('touchend', stopDrag);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', stopDrag);
+        window.addEventListener('touchmove', onTouchMove, { passive: true });
+        window.addEventListener('touchend', stopDrag);
+      };
+
+      header.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
+      header.addEventListener('touchstart', (e) => {
+        if (e.touches[0]) startDrag(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: true });
+
+      // Redimensionnement
+      const startResize = (clientX, clientY) => {
+        if (winObj.maximized) return;
+        focusWindow(winObj.id);
+        document.body.classList.add('is-dragging');
+        const startX = clientX;
+        const startY = clientY;
+        const origW = winObj.width;
+        const origH = winObj.height;
+
+        const onMove = (mx, my) => {
+          winObj.width = Math.max(280, origW + (mx - startX));
+          winObj.height = Math.max(220, origH + (my - startY));
+          winEl.style.width = `${winObj.width}px`;
+          winEl.style.height = `${winObj.height}px`;
+        };
+
+        const onMouseMove = (e) => onMove(e.clientX, e.clientY);
+        const onTouchMove = (e) => {
+          if (e.touches[0]) onMove(e.touches[0].clientX, e.touches[0].clientY);
+        };
+
+        const stopResize = () => {
+          document.body.classList.remove('is-dragging');
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', stopResize);
+          window.removeEventListener('touchmove', onTouchMove);
+          window.removeEventListener('touchend', stopResize);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', stopResize);
+        window.addEventListener('touchmove', onTouchMove, { passive: true });
+        window.addEventListener('touchend', stopResize);
+      };
+
+      resizer.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        startResize(e.clientX, e.clientY);
+      });
+      resizer.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        if (e.touches[0]) startResize(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: true });
+    }
+
+    function focusWindow(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj) return;
+      winObj.zIndex = ++topZIndex;
+      const el = document.getElementById(winId);
+      if (el) el.style.zIndex = winObj.zIndex;
+      renderTaskbar();
+    }
+
+    function closeWindow(winId) {
+      windows = windows.filter(w => w.id !== winId);
+      const el = document.getElementById(winId);
+      if (el) el.remove();
+      renderTaskbar();
+    }
+
+    function toggleMinimizeWindow(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      const el = document.getElementById(winId);
+      if (!winObj || !el) return;
+      winObj.minimized = !winObj.minimized;
+      el.style.display = winObj.minimized ? 'none' : 'flex';
+      if (!winObj.minimized) focusWindow(winId);
+      renderTaskbar();
+    }
+
+    function toggleMaximizeWindow(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      const el = document.getElementById(winId);
+      if (!winObj || !el) return;
+      winObj.maximized = !winObj.maximized;
+      if (winObj.maximized) {
+        el.style.left = '0px';
+        el.style.top = '0px';
+        el.style.width = '100%';
+        el.style.height = '100%';
+        el.style.borderRadius = '0px';
+      } else {
+        el.style.left = `${winObj.left}px`;
+        el.style.top = `${winObj.top}px`;
+        el.style.width = `${winObj.width}px`;
+        el.style.height = `${winObj.height}px`;
+        el.style.borderRadius = '1rem';
+      }
+      focusWindow(winId);
+    }
+
+    function minimizeAllWindows() {
+      windows.forEach(w => {
+        w.minimized = true;
+        const el = document.getElementById(w.id);
+        if (el) el.style.display = 'none';
+      });
+      renderTaskbar();
+    }
+
+    /* ==========================================================================
+       5. MONTAGE DES APPLICATIONS INTÉGRÉES
+       ========================================================================== */
+    function mountAppContent(winObj) {
+      const body = document.getElementById(`${winObj.id}-body`);
+      if (!body) return;
+
+      switch (winObj.appId) {
+        case 'connect': renderConnectApp(winObj, body); break;
+        case 'files': renderFilesApp(winObj, body); break;
+        case 'browser': renderBrowserApp(winObj, body); break;
+        case 'notepad': renderNotepadApp(winObj, body); break;
+        case 'terminal': renderTerminalApp(winObj, body); break;
+        case 'calculator': renderCalculatorApp(winObj, body); break;
+        case 'settings': renderSettingsApp(winObj, body); break;
+      }
+    }
+
+    /* --- APPLICATION 0 : DEXCONNECT (PONT TÉLÉPHONE <-> ORDINATEUR) --- */
+    const dexBridgeState = {
+      status: 'disconnected', // 'disconnected' | 'waiting' | 'connected'
+      role: null,             // 'phone' | 'pc'
+      sessionCode: String(Math.floor(100000 + Math.random() * 900000)),
+      pc: null,
+      dataChannel: null,
+      localStream: null,
+      bc: null,
+      cursorX: window.innerWidth / 2,
+      cursorY: window.innerHeight / 2
+    };
+
+    function updateDexBridgeStatus(newStatus, labelText = '') {
+      dexBridgeState.status = newStatus;
+      const dot = document.getElementById('connect-status-dot');
+      const btn = document.getElementById('taskbar-connect-btn');
+      const badge = document.getElementById('dexconnect-badge');
+
+      if (dot) {
+        dot.className = 'w-2.5 h-2.5 rounded-full ' + (
+          newStatus === 'connected' ? 'bg-emerald-400 animate-pulse' :
+          newStatus === 'waiting' ? 'bg-amber-400 animate-ping' :
+          'bg-slate-300'
+        );
+      }
+      if (btn && newStatus === 'connected') {
+        btn.classList.remove('from-cyan-600', 'to-blue-600');
+        btn.classList.add('from-emerald-600', 'to-teal-600');
+      } else if (btn) {
+        btn.classList.remove('from-emerald-600', 'to-teal-600');
+        btn.classList.add('from-cyan-600', 'to-blue-600');
+      }
+      if (badge) {
+        badge.textContent = labelText || (
+          newStatus === 'connected' ? 'Connecté (Écran + Clavier/Souris actifs)' :
+          newStatus === 'waiting' ? 'En attente de liaison...' :
+          'Déconnecté'
+        );
+      }
+    }
+
+    function renderConnectApp(winObj, body) {
+      body.innerHTML = `
+        <div class="h-full overflow-y-auto p-4 sm:p-6 space-y-5 text-sm">
+          <!-- En-tête DexConnect -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              </div>
+              <div>
+                <h2 class="font-bold text-base sm:text-lg">DexConnect — Pont Téléphone ↔ Ordinateur</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Affichez votre téléphone sur l'écran du PC et pilotez-le avec le clavier et la souris de l'ordinateur.</p>
+              </div>
+            </div>
+            <span id="dexconnect-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700">
+              ${dexBridgeState.status === 'connected' ? 'Connecté' : dexBridgeState.status === 'waiting' ? 'En attente...' : 'Déconnecté'}
+            </span>
+          </div>
+
+          <!-- Encart explicatif transparent sur le fonctionnement technique -->
+          <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-200 space-y-1">
+            <div class="font-semibold flex items-center gap-1.5">
+              <span>💡</span>
+              <span>Comment fonctionne la liaison directe avec votre ordinateur ?</span>
+            </div>
+            <p class="leading-relaxed opacity-95">
+              Par sécurité navigateur, un téléphone ne peut pas prendre le contrôle d'un PC Windows/Mac sans récepteur. Choisissez l'une des deux méthodes ci-dessous :
+              <b>(1) Sans-fil WebRTC</b> en ouvrant cette page sur l'ordi en mode Récepteur, ou <b>(2) Câble USB-C / HDMI</b> en 1 clic.
+            </p>
+          </div>
+
+          <!-- Deux grands boutons d'action principaux ("1 clic") -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <!-- Bouton 1 : Côté Téléphone -->
+            <button onclick="startPhoneSenderMode()" class="group p-4 rounded-2xl bg-gradient-to-br from-cyan-600/15 to-blue-600/20 hover:from-cyan-600/25 hover:to-blue-600/30 border-2 border-cyan-500/40 hover:border-cyan-400 text-left transition flex flex-col justify-between gap-3 shadow-sm">
+              <div class="flex items-center justify-between w-full">
+                <span class="px-2.5 py-0.5 rounded-full bg-cyan-500 text-slate-950 font-bold text-[10px] uppercase tracking-wider">Sur votre Téléphone</span>
+                <span class="text-2xl group-hover:scale-110 transition">📱➔🖥️</span>
+              </div>
+              <div>
+                <h3 class="font-bold text-base text-cyan-600 dark:text-cyan-300">Je suis sur mon Téléphone → Connecter au PC</h3>
+                <p class="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                  Diffuse instantanément votre écran vers l'ordinateur et active la réception du <b>clavier et de la souris du PC</b> (curseur virtuel en direct).
+                </p>
+              </div>
+              <div class="w-full py-2 rounded-xl bg-cyan-600 group-hover:bg-cyan-500 text-white text-center font-semibold text-xs shadow">
+                Démarrer le partage & contrôle PC
+              </div>
+            </button>
+
+            <!-- Bouton 2 : Côté Ordinateur -->
+            <button onclick="startPCReceiverMode()" class="group p-4 rounded-2xl bg-gradient-to-br from-indigo-600/15 to-purple-600/20 hover:from-indigo-600/25 hover:to-purple-600/30 border-2 border-indigo-500/40 hover:border-indigo-400 text-left transition flex flex-col justify-between gap-3 shadow-sm">
+              <div class="flex items-center justify-between w-full">
+                <span class="px-2.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold text-[10px] uppercase tracking-wider">Sur votre Ordinateur</span>
+                <span class="text-2xl group-hover:scale-110 transition">🖥️🖱️⌨️</span>
+              </div>
+              <div>
+                <h3 class="font-bold text-base text-indigo-600 dark:text-indigo-300">Je suis sur mon Ordinateur → Recevoir l'écran</h3>
+                <p class="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                  Ouvre le récepteur grand écran sur le PC et transmet automatiquement tous vos mouvements de souris, clics et frappes clavier au téléphone.
+                </p>
+              </div>
+              <div class="w-full py-2 rounded-xl bg-indigo-600 group-hover:bg-indigo-500 text-white text-center font-semibold text-xs shadow">
+                Ouvrir l'écran récepteur PC
+              </div>
+            </button>
+          </div>
+
+          <!-- Méthode Câble USB-C / HDMI & Jumelage WebRTC manuel entre deux appareils -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <!-- Méthode Câble HDMI / USB-C -->
+            <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex flex-col justify-between gap-3">
+              <div>
+                <div class="flex items-center gap-2 font-bold text-xs text-emerald-500 mb-1">
+                  <span>🔌 MÉTHODE CÂBLE USB-C / HDMI (SANS INTERNET)</span>
+                </div>
+                <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Si votre téléphone est branché par câble USB-C/HDMI à l'écran du PC (ou via Presentation API), basculez immédiatement en bureau haute résolution optimisé clavier/souris.
+                </p>
+              </div>
+              <button onclick="connectViaCableOrPresentation()" class="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center justify-center gap-2">
+                <span>Connecter par Câble (HDMI / USB-C)</span>
+              </button>
+            </div>
+
+            <!-- Jumelage WebRTC Peer-to-Peer entre 2 appareils distincts -->
+            <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-xs text-blue-500">📡 LIAISON P2P ENTRE 2 APPAREILS</span>
+                <span class="font-mono text-xs px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 font-bold">Code : ${dexBridgeState.sessionCode}</span>
+              </div>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                1) Sur le <b>téléphone</b> : « Je suis sur mon Téléphone » → un code à 6 chiffres s'affiche. 2) Sur le <b>PC</b> : saisissez ce code ci-dessous puis « Valider ». Aucune copie de jeton nécessaire.
+              </p>
+              <div class="flex gap-1.5">
+                <input id="webrtc-signal-box" type="text" placeholder="Code à 6 chiffres (ou jeton WebRTC)" class="flex-1 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-[11px] font-mono focus:outline-none" />
+                <button onclick="copyWebRTCSignal()" class="px-2.5 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-blue-600 hover:text-white text-[11px] font-medium transition">Copier</button>
+                <button onclick="applyWebRTCSignal()" class="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-medium transition">Valider</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Barre d'état active & bouton de déconnexion -->
+          <div id="dexconnect-active-bar" class="${dexBridgeState.status === 'disconnected' ? 'hidden' : 'flex'} p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 items-center justify-between gap-3">
+            <div class="text-xs">
+              <div class="font-bold text-emerald-400">Session active (${dexBridgeState.role === 'phone' ? 'Émetteur Téléphone' : 'Récepteur PC'})</div>
+              <div class="text-slate-400">Les événements clavier et souris sont synchronisés en temps réel.</div>
+            </div>
+            <button onclick="stopDexConnectSession()" class="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition">Couper la connexion</button>
+          </div>
+        </div>
+      `;
+    }
+
+    /* --- CÔTÉ TÉLÉPHONE : PARTAGE D'ÉCRAN + RÉCEPTION CLAVIER/SOURIS DU PC --- */
+    async function startPhoneSenderMode() {
+      dexBridgeState.role = 'phone';
+      updateDexBridgeStatus('waiting', 'Autorisez le partage d\'écran...');
+
+      // Canal local instantané entre onglets / fenêtres du même appareil
+      if (!dexBridgeState.bc && 'BroadcastChannel' in window) {
+        dexBridgeState.bc = new BroadcastChannel('dexos_bridge_channel');
+        dexBridgeState.bc.onmessage = (ev) => handleRemoteInputFromPC(ev.data);
+      }
+
+      // Initialisation WebRTC PeerConnection + DataChannel pour le contrôle clavier/souris
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      dexBridgeState.pc = pc;
+
+      const dc = pc.createDataChannel('pc-hid-control');
+      dexBridgeState.dataChannel = dc;
+      dc.onopen = () => {
+        updateDexBridgeStatus('connected', 'Connecté au PC (Clavier/Souris actifs)');
+        showToast("Ordinateur connecté ! La souris et le clavier du PC contrôlent désormais ce téléphone.", "success");
+      };
+      dc.onmessage = (ev) => {
+        try {
+          handleRemoteInputFromPC(JSON.parse(ev.data));
+        } catch (e) {}
+      };
+
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+          const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+          dexBridgeState.localStream = stream;
+          stream.getTracks().forEach(track => {
+            pc.addTrack(track, stream);
+            track.onended = () => stopDexConnectSession();
+          });
+        }
+      } catch (err) {
+        showToast("Partage vidéo système non autorisé ou indisponible, activation du pont de contrôle clavier/souris.", "info");
+      }
+
+      if (window.Peer) { try { await startPeerHost(); return; } catch (e) { showToast("Serveur de jumelage injoignable, mode jeton manuel.", "info"); } }
+      // Génération de l'offre WebRTC pour connexion P2P
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await waitForIceGathering(pc);
+
+      const encodedOffer = btoa(JSON.stringify(pc.localDescription));
+      const box = document.getElementById('webrtc-signal-box');
+      if (box) box.value = encodedOffer;
+
+      // Émettre l'annonce sur le canal local BroadcastChannel
+      if (dexBridgeState.bc) {
+        dexBridgeState.bc.postMessage({ type: 'HELLO_FROM_PHONE', code: dexBridgeState.sessionCode });
+      }
+
+      // Afficher le curseur virtuel piloté par le PC
+      const cursorEl = document.getElementById('remote-pc-cursor');
+      if (cursorEl) {
+        cursorEl.classList.remove('hidden');
+        cursorEl.style.left = `${dexBridgeState.cursorX}px`;
+        cursorEl.style.top = `${dexBridgeState.cursorY}px`;
+      }
+
+      updateDexBridgeStatus('connected', 'Mode Téléphone Actif — En attente du PC');
+      const activeBar = document.getElementById('dexconnect-active-bar');
+      if (activeBar) activeBar.classList.remove('hidden');
+      showToast("Mode Téléphone prêt ! Ouvrez « Recevoir l'écran » sur le PC ou collez le jeton.", "success");
+    }
+
+    /* --- JUMELAGE PAR CODE (PeerJS) --- */
+    async function startPeerHost() {
+      const code = dexBridgeState.sessionCode;
+      const peer = new Peer('dexos-' + code);
+      dexBridgeState.peer = peer;
+      await new Promise((ok, ko) => { peer.on('open', ok); peer.on('error', ko); });
+      const box = document.getElementById('webrtc-signal-box');
+      if (box) box.value = code;
+      peer.on('connection', (conn) => {
+        dexBridgeState.dataChannel = { get readyState() { return conn.open ? 'open' : 'closed'; }, send: (s) => conn.send(s) };
+        conn.on('open', () => {
+          updateDexBridgeStatus('connected', 'Connecté au PC (Clavier/Souris actifs)');
+          showToast("Ordinateur connecté ! Sa souris et son clavier pilotent ce téléphone.", "success");
+          if (dexBridgeState.localStream) dexBridgeState.call = peer.call(conn.peer, dexBridgeState.localStream);
+        });
+        conn.on('data', (d) => { try { handleRemoteInputFromPC(typeof d === 'string' ? JSON.parse(d) : d); } catch (e) {} });
+        conn.on('close', () => updateDexBridgeStatus('waiting', 'PC déconnecté — en attente'));
+      });
+      const cursorEl = document.getElementById('remote-pc-cursor');
+      if (cursorEl) cursorEl.classList.remove('hidden');
+      updateDexBridgeStatus('waiting', 'Code ' + code + ' — saisissez-le sur le PC');
+      const activeBar = document.getElementById('dexconnect-active-bar');
+      if (activeBar) activeBar.classList.remove('hidden');
+      showToast("Code de jumelage : " + code + ". Saisissez-le dans DexConnect sur le PC.", "success");
+    }
+
+    async function connectPCToCode(code) {
+      dexBridgeState.role = 'pc';
+      updateDexBridgeStatus('waiting', 'Connexion au téléphone ' + code + '...');
+      const stage = document.getElementById('pc-receiver-stage');
+      const viewport = document.getElementById('receiver-viewport');
+      const videoEl = document.getElementById('receiver-video');
+      const placeholder = document.getElementById('receiver-placeholder');
+      stage.classList.remove('hidden');
+      viewport.focus();
+      const peer = new Peer();
+      dexBridgeState.peer = peer;
+      peer.on('error', () => { showToast("Code introuvable ou téléphone hors ligne.", "error"); stopDexConnectSession(); });
+      peer.on('call', (call) => {
+        call.answer();
+        call.on('stream', (st) => { videoEl.srcObject = st; placeholder.classList.add('hidden'); updateDexBridgeStatus('connected', 'Écran du téléphone affiché sur le PC'); });
+      });
+      peer.on('open', () => {
+        const conn = peer.connect('dexos-' + code, { reliable: true });
+        conn.on('open', () => {
+          dexBridgeState.dataChannel = { get readyState() { return conn.open ? 'open' : 'closed'; }, send: (s) => conn.send(s) };
+          updateDexBridgeStatus('connected', 'Contrôle Clavier & Souris PC actif');
+          showToast("Téléphone connecté !", "success");
+          setTimeout(() => { if (!videoEl.srcObject) placeholder.querySelector('h3').textContent = "Connecté — flux vidéo indisponible sur ce navigateur mobile (la souris/clavier fonctionnent)"; }, 4000);
+        });
+        conn.on('close', () => stopDexConnectSession());
+      });
+      bindPCInputForwarders(viewport);
+    }
+
+    /* --- CÔTÉ ORDINATEUR : RÉCEPTION VIDÉO + ENVOI CLAVIER/SOURIS VERS TÉLÉPHONE --- */
+    async function startPCReceiverMode() {
+      dexBridgeState.role = 'pc';
+      updateDexBridgeStatus('waiting', 'Récepteur PC en attente du téléphone...');
+
+      const stage = document.getElementById('pc-receiver-stage');
+      const viewport = document.getElementById('receiver-viewport');
+      const videoEl = document.getElementById('receiver-video');
+      const placeholder = document.getElementById('receiver-placeholder');
+
+      stage.classList.remove('hidden');
+      viewport.focus();
+
+      if (!dexBridgeState.bc && 'BroadcastChannel' in window) {
+        dexBridgeState.bc = new BroadcastChannel('dexos_bridge_channel');
+        dexBridgeState.bc.onmessage = (ev) => {
+          if (ev.data && ev.data.type === 'HELLO_FROM_PHONE') {
+            updateDexBridgeStatus('connected', 'Téléphone détecté sur le réseau local !');
+            placeholder.innerHTML = `
+              <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-3xl mb-3">✅</div>
+              <h3 class="text-lg font-bold text-emerald-400 mb-1">Téléphone connecté (Liaison locale active)</h3>
+              <p class="text-xs text-slate-300 max-w-md">Déplacez votre souris et tapez sur votre clavier ici : le curseur et la saisie sont envoyés en temps réel sur l'écran du téléphone !</p>
+            `;
+          }
+        };
+      }
+
+      // Configuration WebRTC Récepteur
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      dexBridgeState.pc = pc;
+
+      pc.ontrack = (event) => {
+        if (event.streams && event.streams[0]) {
+          videoEl.srcObject = event.streams[0];
+          placeholder.classList.add('hidden');
+          updateDexBridgeStatus('connected', 'Écran du téléphone affiché sur le PC');
+        }
+      };
+
+      pc.ondatachannel = (event) => {
+        const dc = event.channel;
+        dexBridgeState.dataChannel = dc;
+        dc.onopen = () => {
+          updateDexBridgeStatus('connected', 'Contrôle Clavier & Souris PC actif');
+          showToast("Liaison WebRTC établie avec le téléphone !", "success");
+        };
+      };
+
+      // Capture des événements Souris et Clavier du PC pour les envoyer au téléphone
+      bindPCInputForwarders(viewport);
+    }
+
+    function bindPCInputForwarders(viewport) {
+      const sendInputPayload = (payload) => {
+        if (dexBridgeState.dataChannel && dexBridgeState.dataChannel.readyState === 'open') {
+          dexBridgeState.dataChannel.send(JSON.stringify(payload));
+        }
+        if (dexBridgeState.bc) {
+          dexBridgeState.bc.postMessage(payload);
+        }
+      };
+
+      viewport.onmousemove = (e) => {
+        const rect = viewport.getBoundingClientRect();
+        const nx = (e.clientX - rect.left) / rect.width;
+        const ny = (e.clientY - rect.top) / rect.height;
+        sendInputPayload({ type: 'MOUSE_MOVE', nx, ny });
+      };
+
+      viewport.onmousedown = (e) => {
+        viewport.focus();
+        const rect = viewport.getBoundingClientRect();
+        const nx = (e.clientX - rect.left) / rect.width;
+        const ny = (e.clientY - rect.top) / rect.height;
+        sendInputPayload({ type: 'MOUSE_CLICK', nx, ny, button: e.button });
+      };
+
+      viewport.onwheel = (e) => { e.preventDefault(); sendInputPayload({ type: 'WHEEL', dy: e.deltaY, dx: e.deltaX }); };
+      viewport.oncontextmenu = (e) => e.preventDefault();
+      viewport.onkeydown = (e) => {
+        e.preventDefault();
+        sendInputPayload({ type: 'KEY_PRESS', key: e.key, code: e.code });
+      };
+    }
+
+    /* --- EXÉCUTION SUR LE TÉLÉPHONE DES ACTIONS SOURIS & CLAVIER DU PC --- */
+    function handleRemoteInputFromPC(data) {
+      if (!data || !data.type) return;
+      const cursorEl = document.getElementById('remote-pc-cursor');
+
+      if (data.type === 'MOUSE_MOVE') {
+        dexBridgeState.cursorX = Math.max(0, Math.min(window.innerWidth - 12, data.nx * window.innerWidth));
+        dexBridgeState.cursorY = Math.max(0, Math.min(window.innerHeight - 12, data.ny * window.innerHeight));
+        if (cursorEl) {
+          cursorEl.classList.remove('hidden');
+          cursorEl.style.left = `${dexBridgeState.cursorX}px`;
+          cursorEl.style.top = `${dexBridgeState.cursorY}px`;
+        }
+      } else if (data.type === 'MOUSE_CLICK') {
+        const x = data.nx * window.innerWidth;
+        const y = data.ny * window.innerHeight;
+        // Effet visuel d'onde de clic
+        const ring = document.createElement('div');
+        ring.className = 'fixed w-6 h-6 -ml-3 -mt-3 rounded-full border-2 border-cyan-400 pointer-events-none z-[99998] cursor-click-ring';
+        ring.style.left = `${x}px`;
+        ring.style.top = `${y}px`;
+        document.body.appendChild(ring);
+        setTimeout(() => ring.remove(), 460);
+
+        // Déclencher un vrai clic sur l'élément situé sous le curseur virtuel
+        if (cursorEl) cursorEl.style.display = 'none';
+        const target = document.elementFromPoint(x, y);
+        if (cursorEl) cursorEl.style.display = 'block';
+        if (target) {
+          target.focus && target.focus();
+          target.click && target.click();
+        }
+      } else if (data.type === 'WHEEL') {
+        if (cursorEl) cursorEl.style.display = 'none';
+        let el = document.elementFromPoint(dexBridgeState.cursorX, dexBridgeState.cursorY);
+        if (cursorEl) cursorEl.style.display = 'block';
+        while (el && el.scrollHeight <= el.clientHeight && el.scrollWidth <= el.clientWidth) el = el.parentElement;
+        if (el) el.scrollBy(data.dx, data.dy);
+      } else if (data.type === 'KEY_PRESS') {
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+          if (data.key === 'Backspace') {
+            active.value = active.value.slice(0, -1);
+          } else if (data.key === 'Enter') {
+            if (active.tagName === 'TEXTAREA') active.value += '\n';
+            else active.form && active.form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+          } else if (data.key.length === 1) {
+            active.value += data.key;
+          }
+          active.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    }
+
+    /* --- MÉTHODE CÂBLE USB-C / HDMI & PRESENTATION API --- */
+    async function connectViaCableOrPresentation() {
+      try {
+        if ('PresentationRequest' in window) {
+          const req = new PresentationRequest([location.href]);
+          const conn = await req.start();
+          if (conn) {
+            updateDexBridgeStatus('connected', 'Connecté via moniteur externe (Presentation API)');
+            showToast("Écran externe connecté via Presentation API !", "success");
+            return;
+          }
+        }
+      } catch (e) {}
+
+      // Bascule immédiate en mode bureau grand écran optimisé clavier/souris
+      await toggleDesktopMode();
+      updateDexBridgeStatus('connected', 'Mode Moniteur Externe USB-C / HDMI Actif');
+    }
+
+    function waitForIceGathering(pc) {
+      return new Promise((resolve) => {
+        if (pc.iceGatheringState === 'complete') return resolve();
+        const check = () => {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', check);
+            resolve();
+          }
+        };
+        pc.addEventListener('icegatheringstatechange', check);
+        setTimeout(resolve, 1500);
+      });
+    }
+
+    function copyWebRTCSignal() {
+      const box = document.getElementById('webrtc-signal-box');
+      if (!box || !box.value) {
+        showToast("Aucun jeton généré. Cliquez d'abord sur « Je suis sur mon Téléphone ».", "info");
+        return;
+      }
+      box.select();
+      document.execCommand('copy');
+      showToast("Jeton copié ! Collez-le sur l'ordinateur dans DexConnect.", "success");
+    }
+
+    async function applyWebRTCSignal() {
+      const box = document.getElementById('webrtc-signal-box');
+      if (!box || !box.value.trim()) return;
+      if (/^\d{6}$/.test(box.value.trim())) { if (box.value.trim() !== dexBridgeState.sessionCode || dexBridgeState.role !== 'phone') return connectPCToCode(box.value.trim()); return; }
+      try {
+        const desc = JSON.parse(atob(box.value.trim()));
+        if (desc.type === 'offer') {
+          if (!dexBridgeState.pc) await startPCReceiverMode();
+          await dexBridgeState.pc.setRemoteDescription(new RTCSessionDescription(desc));
+          const answer = await dexBridgeState.pc.createAnswer();
+          await dexBridgeState.pc.setLocalDescription(answer);
+          await waitForIceGathering(dexBridgeState.pc);
+          box.value = btoa(JSON.stringify(dexBridgeState.pc.localDescription));
+          box.select();
+          document.execCommand('copy');
+          showToast("Réponse générée et copiée ! Collez-la sur le téléphone pour finaliser.", "success");
+        } else if (desc.type === 'answer' && dexBridgeState.pc) {
+          await dexBridgeState.pc.setRemoteDescription(new RTCSessionDescription(desc));
+          updateDexBridgeStatus('connected', 'Connecté au PC via WebRTC P2P');
+          showToast("Connexion P2P établie avec succès !", "success");
+        }
+      } catch (err) {
+        showToast("Jeton WebRTC invalide.", "error");
+      }
+    }
+
+    function toggleReceiverFullscreen() {
+      const stage = document.getElementById('pc-receiver-stage');
+      if (!document.fullscreenElement) {
+        stage.requestFullscreen && stage.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen && document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    function stopDexConnectSession() {
+      if (dexBridgeState.localStream) {
+        dexBridgeState.localStream.getTracks().forEach(t => t.stop());
+        dexBridgeState.localStream = null;
+      }
+      if (dexBridgeState.peer) { dexBridgeState.peer.destroy(); dexBridgeState.peer = null; }
+      if (dexBridgeState.pc) {
+        dexBridgeState.pc.close();
+        dexBridgeState.pc = null;
+      }
+      if (dexBridgeState.bc) {
+        dexBridgeState.bc.close();
+        dexBridgeState.bc = null;
+      }
+      dexBridgeState.dataChannel = null;
+      dexBridgeState.role = null;
+      document.getElementById('pc-receiver-stage').classList.add('hidden');
+      document.getElementById('remote-pc-cursor').classList.add('hidden');
+      const activeBar = document.getElementById('dexconnect-active-bar');
+      if (activeBar) activeBar.classList.add('hidden');
+      updateDexBridgeStatus('disconnected', 'Déconnecté');
+      showToast("Session DexConnect terminée.", "info");
+    }
+
+    /* --- APPLICATION 1 : EXPLORATEUR DE FICHIERS --- */
+    let currentImportTargetFolderId = 'root';
+
+    function renderFilesApp(winObj, body) {
+      winObj.currentFolderId = winObj.currentFolderId || 'root';
+
+      body.innerHTML = `
+        <div class="flex flex-col h-full">
+          <!-- Barre d'outils -->
+          <div class="p-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5">
+              <button onclick="filesNavigate('${winObj.id}', 'root')" class="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300" title="Racine">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+              </button>
+              <div id="${winObj.id}-breadcrumbs" class="flex items-center gap-1 text-xs font-medium overflow-x-auto"></div>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button onclick="filesCreateFolder('${winObj.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-medium flex items-center gap-1 transition">
+                <span>+ Dossier</span>
+              </button>
+              <button onclick="filesCreateTextFile('${winObj.id}')" class="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium flex items-center gap-1 transition">
+                <span>+ Note</span>
+              </button>
+              <button onclick="triggerRealFileImport('${winObj.id}')" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center gap-1 transition" title="Importer un fichier depuis votre téléphone/PC">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                <span class="hidden sm:inline">Importer</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Corps principal avec barre latérale -->
+          <div class="flex flex-1 overflow-hidden">
+            <!-- Raccourcis latéraux -->
+            <aside class="w-36 sm:w-44 border-r border-slate-200 dark:border-slate-800 p-2.5 hidden sm:flex flex-col gap-1 bg-slate-50/50 dark:bg-slate-900/40 text-xs">
+              <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-2 mb-1">Emplacements</span>
+              <button onclick="filesNavigate('${winObj.id}', 'root')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 text-left font-medium transition">
+                <span>💻</span> <span>Mon Appareil</span>
+              </button>
+              <button onclick="filesNavigate('${winObj.id}', 'dir-docs')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 text-left font-medium transition">
+                <span>📁</span> <span>Documents</span>
+              </button>
+              <button onclick="filesNavigate('${winObj.id}', 'dir-notes')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 text-left font-medium transition">
+                <span>📝</span> <span>Notes</span>
+              </button>
+              <button onclick="filesNavigate('${winObj.id}', 'dir-images')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 text-left font-medium transition">
+                <span>🖼️</span> <span>Images</span>
+              </button>
+              <button onclick="filesNavigate('${winObj.id}', 'dir-downloads')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 text-left font-medium transition">
+                <span>⬇️</span> <span>Téléchargements</span>
+              </button>
+            </aside>
+
+            <!-- Liste des fichiers et dossiers -->
+            <div id="${winObj.id}-grid" class="flex-1 p-4 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 content-start">
+              <!-- Injecté par refreshFilesGrid -->
+            </div>
+          </div>
+        </div>
+      `;
+
+      refreshFilesGrid(winObj.id);
+    }
+
+    function filesNavigate(winId, folderId) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj) return;
+      winObj.currentFolderId = folderId;
+      refreshFilesGrid(winId);
+    }
+
+    function refreshFilesGrid(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj) return;
+      const folder = findNodeById(winObj.currentFolderId) || vfsRoot;
+      const grid = document.getElementById(`${winId}-grid`);
+      const bc = document.getElementById(`${winId}-breadcrumbs`);
+      if (!grid || !bc) return;
+
+      // Fil d'Ariane
+      const pathNodes = getNodePath(folder.id) || [vfsRoot];
+      bc.innerHTML = pathNodes.map((n, idx) => `
+        ${idx > 0 ? '<span class="text-slate-400">/</span>' : ''}
+        <button onclick="filesNavigate('${winId}', '${n.id}')" class="px-1.5 py-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 ${idx === pathNodes.length - 1 ? 'font-semibold text-blue-500' : 'text-slate-600 dark:text-slate-300'}">${n.name}</button>
+      `).join('');
+
+      if (!folder.children || folder.children.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full flex flex-col items-center justify-center py-12 text-slate-400 text-center">
+            <svg class="w-12 h-12 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/></svg>
+            <p class="text-sm font-medium">Ce dossier est vide</p>
+            <p class="text-xs mt-1">Créez une note ou importez un fichier depuis votre appareil.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = folder.children.map(item => {
+        const isFolder = item.type === 'folder';
+        const isImage = item.mime && item.mime.startsWith('image/');
+        let iconHtml = isFolder
+          ? `<div class="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center text-2xl">📁</div>`
+          : isImage
+            ? `<div class="w-12 h-12 rounded-2xl bg-purple-500/15 text-purple-500 flex items-center justify-center text-2xl">🖼️</div>`
+            : `<div class="w-12 h-12 rounded-2xl bg-blue-500/15 text-blue-500 flex items-center justify-center text-2xl">📄</div>`;
+
+        return `
+          <div class="group relative p-3 rounded-xl border border-slate-200/70 dark:border-slate-800 hover:border-blue-500/50 bg-slate-50/60 dark:bg-slate-900/60 hover:bg-blue-500/5 flex flex-col items-center text-center gap-2 transition cursor-pointer"
+               onclick="${isFolder ? `filesNavigate('${winId}', '${item.id}')` : `openFileItem('${item.id}')`}">
+            ${iconHtml}
+            <span class="text-xs font-medium line-clamp-2 break-all w-full">${item.name}</span>
+            <span class="text-[10px] text-slate-400">${isFolder ? `${item.children.length} élément(s)` : (item.updatedAt || 'Fichier')}</span>
+
+            <!-- Actions au survol -->
+            <div class="absolute top-1.5 right-1.5 hidden group-hover:flex items-center gap-1 bg-white/90 dark:bg-slate-800/95 p-1 rounded-lg shadow border border-slate-200 dark:border-slate-700" onclick="event.stopPropagation()">
+              ${!isFolder ? `<button onclick="exportSingleFile('${item.id}')" class="p-1 hover:text-emerald-500" title="Télécharger sur mon appareil"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></button>` : ''}
+              <button onclick="renameVFSItem('${winId}', '${item.id}')" class="p-1 hover:text-blue-500" title="Renommer"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+              <button onclick="deleteVFSItem('${winId}', '${item.id}')" class="p-1 hover:text-red-500" title="Supprimer"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filesCreateFolder(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj) return;
+      showOSModal({
+        title: "Nouveau dossier",
+        desc: "Entrez le nom du dossier à créer :",
+        showInput: true,
+        defaultValue: "Nouveau dossier",
+        onConfirm: (val) => {
+          const name = val.trim();
+          if (!name) return;
+          const folder = findNodeById(winObj.currentFolderId) || vfsRoot;
+          folder.children.push({
+            id: 'dir-' + Date.now(),
+            name,
+            type: 'folder',
+            children: []
+          });
+          saveVFS();
+          refreshFilesGrid(winId);
+          showToast(`Dossier « ${name} » créé.`, "success");
+        }
+      });
+    }
+
+    function filesCreateTextFile(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj) return;
+      showOSModal({
+        title: "Nouveau fichier texte",
+        desc: "Nom du fichier (ex: Notes.txt ou Rapport.md) :",
+        showInput: true,
+        defaultValue: "Nouvelle_note.txt",
+        onConfirm: (val) => {
+          let name = val.trim();
+          if (!name) return;
+          if (!name.includes('.')) name += '.txt';
+          const folder = findNodeById(winObj.currentFolderId) || vfsRoot;
+          const newFile = {
+            id: 'file-' + Date.now(),
+            name,
+            type: 'file',
+            mime: 'text/plain',
+            updatedAt: new Date().toLocaleDateString('fr-FR'),
+            content: ''
+          };
+          folder.children.push(newFile);
+          saveVFS();
+          refreshFilesGrid(winId);
+          openApp('notepad', { fileId: newFile.id });
+        }
+      });
+    }
+
+    function openFileItem(fileId) {
+      const file = findNodeById(fileId);
+      if (!file) return;
+      if (file.mime && file.mime.startsWith('image/') && file.dataUrl) {
+        // Ouvrir un aperçu d'image dans une modal propre
+        showOSModal({
+          title: file.name,
+          desc: `<img src="${file.dataUrl}" alt="${file.name}" class="max-h-64 mx-auto rounded-xl border border-slate-700 my-2" />`,
+          showInput: false,
+          isHtmlDesc: true,
+          onConfirm: () => {}
+        });
+      } else {
+        openApp('notepad', { fileId: file.id });
+      }
+    }
+
+    function renameVFSItem(winId, itemId) {
+      const item = findNodeById(itemId);
+      if (!item) return;
+      showOSModal({
+        title: "Renommer",
+        desc: `Nouveau nom pour « ${item.name} » :`,
+        showInput: true,
+        defaultValue: item.name,
+        onConfirm: (val) => {
+          const name = val.trim();
+          if (!name) return;
+          item.name = name;
+          saveVFS();
+          refreshFilesGrid(winId);
+        }
+      });
+    }
+
+    function deleteVFSItem(winId, itemId) {
+      const parent = findParentNode(itemId);
+      const item = findNodeById(itemId);
+      if (!parent || !item) return;
+      showOSModal({
+        title: "Supprimer l'élément",
+        desc: `Voulez-vous vraiment supprimer « ${item.name} » ?`,
+        showInput: false,
+        onConfirm: () => {
+          parent.children = parent.children.filter(c => c.id !== itemId);
+          saveVFS();
+          refreshFilesGrid(winId);
+          showToast("Élément supprimé.", "info");
+        }
+      });
+    }
+
+    function triggerRealFileImport(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      currentImportTargetFolderId = winObj ? winObj.currentFolderId : 'root';
+      document.getElementById('real-file-importer').click();
+    }
+
+    function handleRealFileImport(event) {
+      const files = Array.from(event.target.files || []);
+      if (!files.length) return;
+      const targetFolder = findNodeById(currentImportTargetFolderId) || vfsRoot;
+
+      files.forEach(file => {
+        const reader = new FileReader();
+        if (file.type.startsWith('image/')) {
+          reader.onload = (e) => {
+            targetFolder.children.push({
+              id: 'file-' + Date.now() + Math.random().toString(36).slice(2, 6),
+              name: file.name,
+              type: 'file',
+              mime: file.type,
+              updatedAt: new Date().toLocaleDateString('fr-FR'),
+              dataUrl: e.target.result,
+              content: '[Fichier Image]'
+            });
+            saveVFS();
+            windows.filter(w => w.appId === 'files').forEach(w => refreshFilesGrid(w.id));
+          };
+          reader.readAsDataURL(file);
+        } else {
+          reader.onload = (e) => {
+            targetFolder.children.push({
+              id: 'file-' + Date.now() + Math.random().toString(36).slice(2, 6),
+              name: file.name,
+              type: 'file',
+              mime: file.type || 'text/plain',
+              updatedAt: new Date().toLocaleDateString('fr-FR'),
+              content: e.target.result
+            });
+            saveVFS();
+            windows.filter(w => w.appId === 'files').forEach(w => refreshFilesGrid(w.id));
+          };
+          reader.readAsText(file);
+        }
+      });
+
+      showToast(`${files.length} fichier(s) importé(s) dans DexOS.`, "success");
+      event.target.value = '';
+    }
+
+    function exportSingleFile(fileId) {
+      const file = findNodeById(fileId);
+      if (!file) return;
+      const a = document.createElement('a');
+      if (file.dataUrl) {
+        a.href = file.dataUrl;
+      } else {
+        const blob = new Blob([file.content || ''], { type: 'text/plain;charset=utf-8' });
+        a.href = URL.createObjectURL(blob);
+      }
+      a.download = file.name;
+      a.click();
+      showToast(`Exportation de « ${file.name} » lancée.`, "success");
+    }
+
+    /* --- APPLICATION 2 : NAVIGATEUR WEB (WEBSURF) --- */
+    function renderBrowserApp(winObj, body) {
+      const initialUrl = 'https://fr.m.wikipedia.org/wiki/Wikip%C3%A9dia:Accueil_principal';
+      winObj.browserHistory = [initialUrl];
+      winObj.historyIndex = 0;
+
+      body.innerHTML = `
+        <div class="flex flex-col h-full">
+          <!-- Barre de navigation URL -->
+          <div class="p-2 border-b border-slate-200 dark:border-slate-800 bg-slate-100/90 dark:bg-slate-900/95 flex items-center gap-1.5">
+            <button onclick="browserBack('${winObj.id}')" class="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300" title="Précédent">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <button onclick="browserForward('${winObj.id}')" class="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300" title="Suivant">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <button onclick="browserReload('${winObj.id}')" class="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300" title="Actualiser">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+
+            <form onsubmit="event.preventDefault(); browserGo('${winObj.id}', document.getElementById('${winObj.id}-url').value)" class="flex-1 flex items-center">
+              <input id="${winObj.id}-url" type="text" value="${initialUrl}" placeholder="Rechercher ou saisir une adresse web (https://...)" class="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300/80 dark:border-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </form>
+
+            <button onclick="browserOpenExternal('${winObj.id}')" class="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium flex items-center gap-1 shrink-0" title="Ouvrir dans un nouvel onglet externe si le site bloque l'intégration">
+              <span class="hidden sm:inline">Onglet Externe</span>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            </button>
+          </div>
+
+          <!-- Barre de favoris intégrables -->
+          <div class="px-3 py-1.5 border-b border-slate-200/70 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/60 flex items-center gap-2 overflow-x-auto text-[11px]">
+            <span class="text-slate-400 font-medium shrink-0">Favoris :</span>
+            <button onclick="browserGo('${winObj.id}', 'https://fr.m.wikipedia.org/wiki/Wikip%C3%A9dia:Accueil_principal')" class="px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 hover:bg-blue-500 hover:text-white transition shrink-0">📚 Wikipédia</button>
+            <button onclick="browserGo('${winObj.id}', 'https://www.openstreetmap.org/export/embed.html?bbox=5.88%2C43.10%2C5.98%2C43.15&layer=mapnik')" class="px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 hover:bg-blue-500 hover:text-white transition shrink-0">🗺️ OpenStreetMap</button>
+            <button onclick="browserGo('${winObj.id}', 'https://archive.org')" class="px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 hover:bg-blue-500 hover:text-white transition shrink-0">🏛️ Internet Archive</button>
+            <button onclick="browserGo('${winObj.id}', 'https://www.bing.com')" class="px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 hover:bg-blue-500 hover:text-white transition shrink-0">🔎 Recherche Bing</button>
+          </div>
+
+          <!-- Bannière d'information sécurité X-Frame-Options -->
+          <div class="px-3 py-1 bg-amber-500/10 border-b border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 flex items-center justify-between gap-2">
+            <span>ℹ️ Certains sites (Google, YouTube...) bloquent l'affichage intégré par sécurité. Utilisez le bouton <b>Onglet Externe</b> en haut à droite si une page reste blanche.</span>
+          </div>
+
+          <!-- Vue Web Iframe -->
+          <div class="relative flex-1 w-full bg-white">
+            <iframe id="${winObj.id}-iframe" src="${initialUrl}" class="w-full h-full border-0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+          </div>
+        </div>
+      `;
+    }
+
+    function browserGo(winId, rawInput) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj) return;
+      let url = rawInput.trim();
+      if (!url) return;
+
+      // Si ce n'est pas une URL, effectuer une recherche Bing intégrable
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        if (url.includes('.') && !url.includes(' ')) {
+          url = 'https://' + url;
+        } else {
+          url = 'https://www.bing.com/search?q=' + encodeURIComponent(url);
+        }
+      }
+
+      winObj.browserHistory = winObj.browserHistory.slice(0, winObj.historyIndex + 1);
+      winObj.browserHistory.push(url);
+      winObj.historyIndex = winObj.browserHistory.length - 1;
+
+      const urlInput = document.getElementById(`${winId}-url`);
+      const iframe = document.getElementById(`${winId}-iframe`);
+      if (urlInput) urlInput.value = url;
+      if (iframe) iframe.src = url;
+    }
+
+    function browserBack(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj || winObj.historyIndex <= 0) return;
+      winObj.historyIndex--;
+      const url = winObj.browserHistory[winObj.historyIndex];
+      document.getElementById(`${winId}-url`).value = url;
+      document.getElementById(`${winId}-iframe`).src = url;
+    }
+
+    function browserForward(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj || winObj.historyIndex >= winObj.browserHistory.length - 1) return;
+      winObj.historyIndex++;
+      const url = winObj.browserHistory[winObj.historyIndex];
+      document.getElementById(`${winId}-url`).value = url;
+      document.getElementById(`${winId}-iframe`).src = url;
+    }
+
+    function browserReload(winId) {
+      const iframe = document.getElementById(`${winId}-iframe`);
+      if (iframe) iframe.src = iframe.src;
+    }
+
+    function browserOpenExternal(winId) {
+      const url = document.getElementById(`${winId}-url`)?.value;
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    /* --- APPLICATION 3 : BLOC-NOTES PRO --- */
+    function renderNotepadApp(winObj, body) {
+      body.innerHTML = `
+        <div class="flex flex-col h-full">
+          <!-- Barre d'outils éditeur -->
+          <div class="p-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <span id="${winObj.id}-filename" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 truncate">Document sans titre.txt</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="notepadNew('${winObj.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-medium transition">Nouveau</button>
+              <button onclick="notepadSave('${winObj.id}')" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center gap-1 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                <span>Enregistrer</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Zone de saisie -->
+          <textarea id="${winObj.id}-editor" oninput="updateNotepadStats('${winObj.id}')" placeholder="Commencez à rédiger votre document ou vos notes ici..." class="flex-1 w-full p-4 bg-transparent resize-none focus:outline-none text-sm leading-relaxed font-sans"></textarea>
+
+          <!-- Barre d'état compteur -->
+          <div class="px-3 py-1.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 text-[11px] text-slate-500 flex justify-between">
+            <span id="${winObj.id}-stats">0 mots • 0 caractères</span>
+            <span>UTF-8 • Sauvegarde locale</span>
+          </div>
+        </div>
+      `;
+
+      if (winObj.params && winObj.params.fileId) {
+        loadFileIntoNotepad(winObj.id, winObj.params.fileId);
+      } else {
+        // Charger le fichier de bienvenue par défaut
+        loadFileIntoNotepad(winObj.id, 'file-welcome');
+      }
+    }
+
+    function loadFileIntoNotepad(winId, fileId) {
+      const winObj = windows.find(w => w.id === winId);
+      const file = findNodeById(fileId);
+      if (!winObj || !file) return;
+      winObj.editingFileId = file.id;
+      const editor = document.getElementById(`${winId}-editor`);
+      const label = document.getElementById(`${winId}-filename`);
+      if (editor) editor.value = file.content || '';
+      if (label) label.textContent = file.name;
+      updateNotepadStats(winId);
+    }
+
+    function notepadNew(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj) return;
+      winObj.editingFileId = null;
+      document.getElementById(`${winId}-editor`).value = '';
+      document.getElementById(`${winId}-filename`).textContent = 'Nouveau_document.txt';
+      updateNotepadStats(winId);
+    }
+
+    function notepadSave(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj) return;
+      const content = document.getElementById(`${winId}-editor`).value;
+
+      if (winObj.editingFileId) {
+        const file = findNodeById(winObj.editingFileId);
+        if (file) {
+          file.content = content;
+          file.updatedAt = new Date().toLocaleDateString('fr-FR');
+          saveVFS();
+          showToast(`Fichier « ${file.name} » enregistré.`, "success");
+          return;
+        }
+      }
+
+      // Sinon demander un nom et sauvegarder dans Documents
+      showOSModal({
+        title: "Enregistrer sous",
+        desc: "Nom du fichier (enregistré dans le dossier Documents) :",
+        showInput: true,
+        defaultValue: "Note_" + new Date().toLocaleDateString('fr-FR').replace(/\//g, '-') + ".txt",
+        onConfirm: (val) => {
+          let name = val.trim();
+          if (!name) return;
+          if (!name.includes('.')) name += '.txt';
+          const docsFolder = findNodeById('dir-docs') || vfsRoot;
+          const newFile = {
+            id: 'file-' + Date.now(),
+            name,
+            type: 'file',
+            mime: 'text/plain',
+            updatedAt: new Date().toLocaleDateString('fr-FR'),
+            content
+          };
+          docsFolder.children.push(newFile);
+          winObj.editingFileId = newFile.id;
+          document.getElementById(`${winId}-filename`).textContent = newFile.name;
+          saveVFS();
+          windows.filter(w => w.appId === 'files').forEach(w => refreshFilesGrid(w.id));
+          showToast(`Enregistré dans Documents/${name}`, "success");
+        }
+      });
+    }
+
+    function updateNotepadStats(winId) {
+      const text = document.getElementById(`${winId}-editor`)?.value || '';
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      const chars = text.length;
+      const el = document.getElementById(`${winId}-stats`);
+      if (el) el.textContent = `${words} mot(s) • ${chars} caractère(s)`;
+    }
+
+    /* --- APPLICATION 4 : TERMINAL / CONSOLE --- */
+    function renderTerminalApp(winObj, body) {
+      winObj.cwdId = 'root';
+
+      body.innerHTML = `
+        <div onclick="document.getElementById('${winObj.id}-cmd').focus()" class="h-full w-full bg-[#0b101b] text-emerald-400 font-mono text-xs p-3.5 overflow-y-auto flex flex-col">
+          <div id="${winObj.id}-output" class="space-y-1.5 selectable-text leading-relaxed">
+            <div class="text-sky-400 font-semibold">DexOS Shell [Version 2.4.0-PWA]</div>
+            <div class="text-slate-400">Tapez <span class="text-amber-300">help</span> pour afficher la liste des commandes disponibles.</div>
+            <div class="h-2"></div>
+          </div>
+          <form onsubmit="event.preventDefault(); execTerminalCmd('${winObj.id}')" class="flex items-center gap-2 mt-1.5">
+            <span id="${winObj.id}-prompt" class="text-blue-400 font-semibold shrink-0">user@dexos:/$</span>
+            <input id="${winObj.id}-cmd" type="text" autocomplete="off" spellcheck="false" class="flex-1 bg-transparent text-emerald-300 focus:outline-none" autofocus />
+          </form>
+        </div>
+      `;
+    }
+
+    function execTerminalCmd(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      const input = document.getElementById(`${winId}-cmd`);
+      const output = document.getElementById(`${winId}-output`);
+      const promptEl = document.getElementById(`${winId}-prompt`);
+      if (!winObj || !input || !output) return;
+
+      const raw = input.value.trim();
+      input.value = '';
+
+      const currentFolder = findNodeById(winObj.cwdId) || vfsRoot;
+      const pathStr = '/' + getNodePath(currentFolder.id).slice(1).map(n => n.name).join('/');
+
+      const line = document.createElement('div');
+      line.innerHTML = `<span class="text-blue-400 font-semibold">user@dexos:${pathStr}$</span> <span class="text-white">${escapeHtml(raw)}</span>`;
+      output.appendChild(line);
+
+      if (!raw) return;
+
+      const parts = raw.split(/\s+/);
+      const cmd = parts[0].toLowerCase();
+      const arg = parts.slice(1).join(' ');
+      let response = '';
+
+      switch (cmd) {
+        case 'help':
+          response = `Commandes disponibles :\n  <span class="text-amber-300">ls</span>            - Lister les fichiers du dossier courant\n  <span class="text-amber-300">cd [dossier]</span>  - Changer de dossier (ex: cd Documents, cd ..)\n  <span class="text-amber-300">mkdir [nom]</span>   - Créer un nouveau dossier\n  <span class="text-amber-300">cat [fichier]</span> - Afficher le contenu d'un fichier\n  <span class="text-amber-300">neofetch</span>      - Afficher les informations système\n  <span class="text-amber-300">date</span>          - Afficher la date et l'heure\n  <span class="text-amber-300">clear</span>         - Effacer l'écran du terminal`;
+          break;
+        case 'ls':
+          if (!currentFolder.children || currentFolder.children.length === 0) {
+            response = '<span class="text-slate-500">(dossier vide)</span>';
+          } else {
+            response = currentFolder.children.map(c =>
+              c.type === 'folder' ? `<span class="text-blue-400 font-bold">${c.name}/</span>` : `<span class="text-emerald-300">${c.name}</span>`
+            ).join('   ');
+          }
+          break;
+        case 'cd':
+          if (!arg || arg === '/') {
+            winObj.cwdId = 'root';
+          } else if (arg === '..') {
+            const parent = findParentNode(currentFolder.id);
+            if (parent) winObj.cwdId = parent.id;
+          } else {
+            const target = (currentFolder.children || []).find(c => c.type === 'folder' && c.name.toLowerCase() === arg.toLowerCase());
+            if (target) {
+              winObj.cwdId = target.id;
+            } else {
+              response = `<span class="text-red-400">cd: ${escapeHtml(arg)}: Aucun dossier de ce nom</span>`;
+            }
+          }
+          break;
+        case 'mkdir':
+          if (!arg) {
+            response = `<span class="text-red-400">Usage: mkdir [nom_du_dossier]</span>`;
+          } else {
+            currentFolder.children.push({ id: 'dir-' + Date.now(), name: arg, type: 'folder', children: [] });
+            saveVFS();
+            windows.filter(w => w.appId === 'files').forEach(w => refreshFilesGrid(w.id));
+            response = `Dossier '${escapeHtml(arg)}' créé.`;
+          }
+          break;
+        case 'cat':
+          const file = (currentFolder.children || []).find(c => c.type === 'file' && c.name.toLowerCase() === arg.toLowerCase());
+          if (file) {
+            response = escapeHtml(file.content || '');
+          } else {
+            response = `<span class="text-red-400">cat: ${escapeHtml(arg)}: Fichier introuvable</span>`;
+          }
+          break;
+        case 'date':
+          response = new Date().toLocaleString('fr-FR');
+          break;
+        case 'whoami':
+          response = 'utilisateur_dexos';
+          break;
+        case 'neofetch':
+          response = `<span class="text-cyan-400 font-bold">OS:</span> DexOS Web 2.4 (PWA Desktop)\n<span class="text-cyan-400 font-bold">Résolution Écran:</span> ${window.innerWidth}x${window.innerHeight}\n<span class="text-cyan-400 font-bold">Plateforme:</span> ${navigator.platform || 'Web'}\n<span class="text-cyan-400 font-bold">Stockage VFS:</span> Actif (LocalStorage)`;
+          break;
+        case 'clear':
+          output.innerHTML = '';
+          break;
+        default:
+          response = `<span class="text-red-400">Commande inconnue : ${escapeHtml(cmd)}. Tapez 'help'.</span>`;
+      }
+
+      if (response) {
+        const resEl = document.createElement('pre');
+        resEl.className = 'whitespace-pre-wrap font-mono text-xs text-slate-300';
+        resEl.innerHTML = response;
+        output.appendChild(resEl);
+      }
+
+      const updatedFolder = findNodeById(winObj.cwdId) || vfsRoot;
+      const updatedPath = '/' + getNodePath(updatedFolder.id).slice(1).map(n => n.name).join('/');
+      if (promptEl) promptEl.textContent = `user@dexos:${updatedPath}$`;
+      output.parentElement.scrollTop = output.parentElement.scrollHeight;
+    }
+
+    /* --- APPLICATION 5 : CALCULATRICE --- */
+    function renderCalculatorApp(winObj, body) {
+      winObj.calcExpr = '';
+      body.innerHTML = `
+        <div class="flex flex-col h-full p-3.5 bg-slate-100 dark:bg-slate-950 gap-3">
+          <div class="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col items-end justify-end h-24">
+            <div id="${winObj.id}-calc-sub" class="text-xs text-slate-400 font-mono h-4"></div>
+            <div id="${winObj.id}-calc-main" class="text-2xl font-bold font-mono truncate w-full text-right">0</div>
+          </div>
+          <div class="grid grid-cols-4 gap-2 flex-1">
+            ${['C', '(', ')', '/', '7', '8', '9', '*', '4', '5', '6', '-', '1', '2', '3', '+', '0', '.', '⌫', '='].map(btn => {
+              const isOp = ['/', '*', '-', '+', '='].includes(btn);
+              const isClear = btn === 'C';
+              return `
+                <button onclick="calcPress('${winObj.id}', '${btn}')" class="rounded-xl font-semibold text-base transition active:scale-95 ${
+                  btn === '=' ? 'bg-blue-600 hover:bg-blue-700 text-white' :
+                  isOp ? 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/25' :
+                  isClear ? 'bg-red-500/15 text-red-500 hover:bg-red-500/25' :
+                  'bg-white dark:bg-slate-900 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800'
+                }">${btn}</button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function calcPress(winId, key) {
+      const winObj = windows.find(w => w.id === winId);
+      const mainEl = document.getElementById(`${winId}-calc-main`);
+      const subEl = document.getElementById(`${winId}-calc-sub`);
+      if (!winObj || !mainEl) return;
+
+      if (key === 'C') {
+        winObj.calcExpr = '';
+        mainEl.textContent = '0';
+        subEl.textContent = '';
+      } else if (key === '⌫') {
+        winObj.calcExpr = winObj.calcExpr.slice(0, -1);
+        mainEl.textContent = winObj.calcExpr || '0';
+      } else if (key === '=') {
+        try {
+          if (!/^[0-9+\-*/().\s]+$/.test(winObj.calcExpr)) throw new Error();
+          const result = Function('"use strict";return (' + winObj.calcExpr + ')')();
+          subEl.textContent = winObj.calcExpr + ' =';
+          winObj.calcExpr = String(Number.isFinite(result) ? Math.round(result * 1e10) / 1e10 : 'Erreur');
+          mainEl.textContent = winObj.calcExpr;
+        } catch {
+          mainEl.textContent = 'Erreur';
+          winObj.calcExpr = '';
+        }
+      } else {
+        winObj.calcExpr += key;
+        mainEl.textContent = winObj.calcExpr;
+      }
+    }
+
+    /* --- APPLICATION 6 : PARAMÈTRES & ÉCRAN EXTERNE --- */
+    function renderSettingsApp(winObj, body) {
+      body.innerHTML = `
+        <div class="h-full overflow-y-auto p-5 space-y-6 text-sm">
+          <!-- Section Mode Grand Écran / Moniteur PC -->
+          <section class="p-4 rounded-2xl bg-gradient-to-br from-blue-600/15 to-indigo-600/15 border border-blue-500/30 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <span class="text-2xl">🖥️</span>
+                <div>
+                  <h3 class="font-bold text-base">Connexion Grand Écran / Mode DeX</h3>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">Transformez votre smartphone en unité centrale sur moniteur PC ou TV</p>
+                </div>
+              </div>
+              <button onclick="toggleDesktopMode()" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow transition">
+                Activer Plein Écran
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 text-xs">
+              <div class="p-3 rounded-xl bg-white/70 dark:bg-slate-900/70 border border-slate-200/60 dark:border-slate-800">
+                <div class="font-semibold text-blue-500 mb-1">🔌 Connexion Filaire (Recommandée)</div>
+                <p class="text-slate-600 dark:text-slate-300 leading-relaxed">Branchez un adaptateur <b>USB-C vers HDMI</b> sur votre téléphone et reliez-le à l'écran du PC. Activez ensuite le <b>Mode Grand Écran</b>.</p>
+              </div>
+              <div class="p-3 rounded-xl bg-white/70 dark:bg-slate-900/70 border border-slate-200/60 dark:border-slate-800">
+                <div class="font-semibold text-indigo-500 mb-1">📡 Connexion Sans-Fil & Périphériques</div>
+                <p class="text-slate-600 dark:text-slate-300 leading-relaxed">Utilisez <b>Cast / Smart View / AirPlay</b> vers votre écran et connectez un clavier + souris Bluetooth pour un confort maximal.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section Affichage & Fond d'écran -->
+          <section class="space-y-3">
+            <h4 class="font-semibold text-xs uppercase tracking-wider text-slate-400">Apparence & Mise à l'échelle</h4>
+            <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-4">
+              <div class="flex items-center justify-between">
+                <span>Thème de l'interface</span>
+                <button onclick="toggleTheme()" class="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-medium">Basculer Clair / Sombre</button>
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs mb-1.5">
+                  <span>Densité d'affichage (Zoom Bureau)</span>
+                  <span class="font-mono font-semibold text-blue-500" id="settings-zoom-val">${Math.round((parseFloat(document.getElementById('os-root').style.zoom) || 1) * 100)}%</span>
+                </div>
+                <input type="range" min="75" max="135" step="5" value="${Math.round((parseFloat(document.getElementById('os-root').style.zoom) || 1) * 100)}" oninput="setDisplayScale(this.value); document.getElementById('settings-zoom-val').textContent = this.value + '%';" class="w-full accent-blue-600" />
+              </div>
+
+              <div>
+                <span class="text-xs block mb-2">Fonds d'écran disponibles</span>
+                <div class="grid grid-cols-5 gap-2">
+                  <button onclick="setWallpaper('wp-aurora')" class="h-12 rounded-xl wp-aurora border-2 border-white/60 text-[10px] text-white font-medium flex items-end p-1.5">Aurore</button>
+                  <button onclick="setWallpaper('wp-sunset')" class="h-12 rounded-xl wp-sunset border-2 border-white/60 text-[10px] text-white font-medium flex items-end p-1.5">Crépuscule</button>
+                  <button onclick="setWallpaper('wp-emerald')" class="h-12 rounded-xl wp-emerald border-2 border-white/60 text-[10px] text-white font-medium flex items-end p-1.5">Émeraude</button>
+                  <button onclick="setWallpaper('wp-minimal')" class="h-12 rounded-xl wp-minimal border-2 border-white/60 text-[10px] text-white font-medium flex items-end p-1.5">Carbone</button>
+                  <button onclick="setWallpaper('wp-daylight')" class="h-12 rounded-xl wp-daylight border-2 border-slate-300 text-[10px] text-slate-900 font-medium flex items-end p-1.5">Jour</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section Système & Réinitialisation -->
+          <section class="space-y-3">
+            <h4 class="font-semibold text-xs uppercase tracking-wider text-slate-400">Stockage & Système</h4>
+            <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="font-medium text-xs">Réinitialiser le système de fichiers</div>
+                <div class="text-[11px] text-slate-500">Restaure les dossiers et fichiers d'exemple par défaut.</div>
+              </div>
+              <button onclick="resetSystemData()" class="px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500 text-red-500 hover:text-white text-xs font-medium transition">Réinitialiser</button>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function resetSystemData() {
+      showOSModal({
+        title: "Réinitialiser DexOS",
+        desc: "Tous vos fichiers créés dans l'explorateur virtuel seront remplacés par les fichiers d'origine. Continuer ?",
+        showInput: false,
+        onConfirm: () => {
+          localStorage.removeItem(VFS_STORAGE_KEY);
+          vfsRoot = JSON.parse(JSON.stringify(DEFAULT_VFS));
+          saveVFS();
+          windows.filter(w => w.appId === 'files').forEach(w => refreshFilesGrid(w.id));
+          showToast("Système restauré avec succès.", "success");
+        }
+      });
+    }
+
+    /* ==========================================================================
+       6. MODE GRAND ÉCRAN (DESKTOP / DEX MODE) & CONTRÔLES SYSTÈME
+       ========================================================================== */
+    let isDesktopMode = false;
+
+    async function toggleDesktopMode() {
+      const root = document.getElementById('os-root');
+      const banner = document.getElementById('desktop-mode-banner');
+      const taskbarBtn = document.getElementById('taskbar-dex-btn');
+
+      if (!isDesktopMode) {
+        try {
+          if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          }
+        } catch (e) {}
+
+        isDesktopMode = true;
+        // Sur grand moniteur, on optimise légèrement l'échelle si l'écran est large
+        if (window.innerWidth >= 1280) {
+          setDisplayScale(95);
+        }
+        banner.classList.remove('hidden');
+        taskbarBtn.classList.add('bg-indigo-600', 'text-white');
+        showToast("Mode Grand Écran (DeX) activé !", "success");
+      } else {
+        exitDesktopMode();
+      }
+    }
+
+    async function exitDesktopMode() {
+      isDesktopMode = false;
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      } catch (e) {}
+
+      setDisplayScale(100);
+      document.getElementById('desktop-mode-banner').classList.add('hidden');
+      document.getElementById('taskbar-dex-btn').classList.remove('bg-indigo-600', 'text-white');
+      showToast("Retour en mode standard.", "info");
+    }
+
+    function setDisplayScale(percent) {
+      const val = parseInt(percent, 10) || 100;
+      const root = document.getElementById('os-root');
+      root.style.zoom = (val / 100).toString();
+      const label = document.getElementById('zoom-value-display');
+      const slider = document.getElementById('zoom-slider');
+      const bannerText = document.getElementById('banner-text');
+      if (label) label.textContent = `${val}%`;
+      if (slider) slider.value = val;
+      if (bannerText) bannerText.textContent = `Mode Bureau Grand Écran Actif (${val}%)`;
+    }
+
+    function toggleTheme() {
+      const isDark = document.body.classList.toggle('dark');
+      const label = document.getElementById('theme-label');
+      if (label) label.textContent = isDark ? 'Thème Sombre' : 'Thème Clair';
+    }
+
+    function setWallpaper(wpClass) {
+      const root = document.getElementById('os-root');
+      root.classList.remove('wp-aurora', 'wp-sunset', 'wp-emerald', 'wp-minimal', 'wp-daylight');
+      root.classList.add(wpClass);
+      if (wpClass === 'wp-daylight') {
+        document.body.classList.remove('dark');
+      } else {
+        document.body.classList.add('dark');
+      }
+    }
+
+    /* ==========================================================================
+       7. RENDU DU BUREAU, MENU DÉMARRER, BARRE DES TÂCHES & HORLOGE
+       ========================================================================== */
+    function renderDesktopIcons() {
+      const container = document.getElementById('desktop-icons');
+      container.innerHTML = Object.values(APPS).map(app => `
+        <button onclick="openApp('${app.id}')" class="group w-20 sm:w-24 p-2 rounded-2xl hover:bg-white/15 active:bg-white/25 flex flex-col items-center gap-1.5 transition text-center focus:outline-none">
+          <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br ${app.iconBg} shadow-lg flex items-center justify-center group-hover:scale-105 transition">
+            ${app.svg}
+          </div>
+          <span class="text-[11px] sm:text-xs font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] line-clamp-2 leading-tight">
+            ${app.title}
+          </span>
+        </button>
+      `).join('');
+    }
+
+    function renderStartMenuApps(filter = '') {
+      const grid = document.getElementById('start-menu-apps');
+      const query = filter.toLowerCase().trim();
+      const filtered = Object.values(APPS).filter(a => a.title.toLowerCase().includes(query));
+
+      grid.innerHTML = filtered.map(app => `
+        <button onclick="openApp('${app.id}')" class="p-2.5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-slate-800/80 flex flex-col items-center gap-1.5 text-center transition">
+          <div class="w-11 h-11 rounded-2xl bg-gradient-to-br ${app.iconBg} shadow flex items-center justify-center">
+            ${app.svg}
+          </div>
+          <span class="text-[11px] font-medium leading-tight line-clamp-1">${app.title}</span>
+        </button>
+      `).join('');
+    }
+
+    function filterStartMenu(val) {
+      renderStartMenuApps(val);
+    }
+
+    function renderTaskbar() {
+      const container = document.getElementById('taskbar-windows');
+      container.innerHTML = windows.map(w => {
+        const app = APPS[w.appId];
+        const isActive = !w.minimized && w.zIndex === topZIndex;
+        return `
+          <button onclick="handleTaskbarClick('${w.id}')" class="h-10 px-2.5 sm:px-3 rounded-xl flex items-center gap-2 transition shrink-0 border ${
+            isActive
+              ? 'bg-white/90 dark:bg-slate-800 border-blue-500/50 shadow-sm'
+              : 'bg-slate-200/50 dark:bg-slate-900/50 border-transparent hover:bg-slate-200/80 dark:hover:bg-slate-800/70 opacity-85'
+          }">
+            <div class="w-5 h-5 rounded-md bg-gradient-to-br ${app.iconBg} flex items-center justify-center shrink-0">
+              <div class="scale-[0.65]">${app.svg}</div>
+            </div>
+            <span class="text-xs font-medium max-w-[110px] truncate hidden sm:inline">${w.title}</span>
+            <span class="w-1.5 h-1.5 rounded-full ${w.minimized ? 'bg-slate-400' : 'bg-blue-500'}"></span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function handleTaskbarClick(winId) {
+      const winObj = windows.find(w => w.id === winId);
+      if (!winObj) return;
+      if (winObj.minimized) {
+        toggleMinimizeWindow(winId);
+      } else if (winObj.zIndex === topZIndex) {
+        toggleMinimizeWindow(winId);
+      } else {
+        focusWindow(winId);
+      }
+    }
+
+    function toggleStartMenu(forceState) {
+      const menu = document.getElementById('start-menu');
+      const qs = document.getElementById('quick-settings-panel');
+      qs.classList.add('hidden');
+      qs.classList.remove('flex');
+
+      const show = typeof forceState === 'boolean' ? forceState : menu.classList.contains('hidden');
+      if (show) {
+        menu.classList.remove('hidden');
+        menu.classList.add('flex');
+        renderStartMenuApps();
+      } else {
+        menu.classList.add('hidden');
+        menu.classList.remove('flex');
+      }
+    }
+
+    function toggleQuickSettings(forceState) {
+      const qs = document.getElementById('quick-settings-panel');
+      const menu = document.getElementById('start-menu');
+      menu.classList.add('hidden');
+      menu.classList.remove('flex');
+
+      const show = typeof forceState === 'boolean' ? forceState : qs.classList.contains('hidden');
+      if (show) {
+        qs.classList.remove('hidden');
+        qs.classList.add('flex');
+        document.getElementById('screen-res-label').textContent = `${window.innerWidth}×${window.innerHeight}`;
+      } else {
+        qs.classList.add('hidden');
+        qs.classList.remove('flex');
+      }
+    }
+
+    // Fermer les popovers si clic sur le bureau vide
+    document.getElementById('desktop-area').addEventListener('mousedown', () => {
+      toggleStartMenu(false);
+      toggleQuickSettings(false);
+    });
+
+    /* ==========================================================================
+       8. UTILITAIRES SYSTÈME (HORLOGE, BATTERIE, TOASTS, MODALS)
+       ========================================================================== */
+    function updateClockAndSystem() {
+      const now = new Date();
+      document.getElementById('clock-time').textContent = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('clock-date').textContent = now.toLocaleDateString('fr-FR');
+
+      const netEl = document.getElementById('network-indicator');
+      if (netEl) {
+        netEl.className = navigator.onLine ? 'text-emerald-500' : 'text-red-500';
+        netEl.title = navigator.onLine ? 'Connecté à Internet' : 'Hors connexion';
+      }
+    }
+
+    async function initBatteryMonitor() {
+      try {
+        if ('getBattery' in navigator) {
+          const battery = await navigator.getBattery();
+          const updateBat = () => {
+            document.getElementById('battery-level').textContent = `${Math.round(battery.level * 100)}%`;
+          };
+          updateBat();
+          battery.addEventListener('levelchange', updateBat);
+        }
+      } catch (e) {}
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('os-toast-container');
+      const toast = document.createElement('div');
+      const colorBorder = type === 'success' ? 'border-emerald-500/50' : type === 'error' ? 'border-red-500/50' : 'border-blue-500/50';
+      toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl glass-panel border ${colorBorder} shadow-xl text-xs font-medium flex items-center gap-2 animate-slide-up max-w-xs`;
+      toast.innerHTML = `<span>${type === 'success' ? '✅' : type === 'error' ? '⚠️' : 'ℹ️'}</span><span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+      }, 3400);
+    }
+
+    function showOSModal({ title, desc, showInput = false, defaultValue = '', isHtmlDesc = false, onConfirm }) {
+      const overlay = document.getElementById('os-modal-overlay');
+      const titleEl = document.getElementById('os-modal-title');
+      const descEl = document.getElementById('os-modal-desc');
+      const inputEl = document.getElementById('os-modal-input');
+      const cancelBtn = document.getElementById('os-modal-cancel');
+      const confirmBtn = document.getElementById('os-modal-confirm');
+
+      titleEl.textContent = title;
+      if (isHtmlDesc) descEl.innerHTML = desc;
+      else descEl.textContent = desc;
+
+      if (showInput) {
+        inputEl.classList.remove('hidden');
+        inputEl.value = defaultValue;
+      } else {
+        inputEl.classList.add('hidden');
+      }
+
+      overlay.classList.remove('hidden');
+      if (showInput) setTimeout(() => inputEl.focus(), 50);
+
+      const cleanup = () => overlay.classList.add('hidden');
+
+      cancelBtn.onclick = cleanup;
+      confirmBtn.onclick = () => {
+        const val = inputEl.value;
+        cleanup();
+        if (onConfirm) onConfirm(val);
+      };
+      inputEl.onkeydown = (e) => {
+        if (e.key === 'Enter') confirmBtn.click();
+      };
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    /* ==========================================================================
+       9. DÉMARRAGE DU SYSTÈME D'EXPLOITATION
+       ========================================================================== */
+    window.addEventListener('DOMContentLoaded', () => {
+      initPWA();
+      renderDesktopIcons();
+      renderStartMenuApps();
+      updateClockAndSystem();
+      initBatteryMonitor();
+      setInterval(updateClockAndSystem, 10000);
+
+      // Ouvrir automatiquement l'explorateur de fichiers ou un guide de bienvenue léger au démarrage
+      setTimeout(() => {
+        openApp('files');
+      }, 250);
+    });
+  </script>
+</body>
+</html>
